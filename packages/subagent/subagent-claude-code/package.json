@@ -41,7 +41,7 @@
     "@huiliyi37/cordis": "^4.0.0-rc.7"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.93.0",
+    "@anthropic-ai/sdk": "0.111.0",
     "@anthropic-ai/claude-agent-sdk": "0.3.220",
     "@huiliyi37/schemastery": "^3.18.0"
   },
