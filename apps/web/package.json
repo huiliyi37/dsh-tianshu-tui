@@ -35,7 +35,7 @@
     "@huiliyi37/dsh-client-ui-slots": "workspace:^",
     "@huiliyi37/dsh-client-web-react": "workspace:^",
     "@huiliyi37/dsh-pwsh-local": "workspace:^",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.1.1",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",
     "@vitejs/plugin-react": "^4.0.0",
