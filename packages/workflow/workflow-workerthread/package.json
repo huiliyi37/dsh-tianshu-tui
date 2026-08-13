@@ -64,6 +64,6 @@
     "@huiliyi37/dsh-tools": "workspace:^",
     "@huiliyi37/dsh-workflow": "workspace:^",
     "@huiliyi37/cordis": "^4.0.0-rc.7",
-    "tsx": "^4.19.2"
+    "tsx": "^4.23.1"
   }
 }

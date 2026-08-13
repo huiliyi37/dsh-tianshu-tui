@@ -33,7 +33,7 @@
   "license": "MIT",
   "dependencies": {
     "execa": "^10.0.0",
-    "tsx": "^4.22.4"
+    "tsx": "^4.23.1"
   },
   "peerDependencies": {
     "@huiliyi37/dsh-agent": "^0.2.0",
