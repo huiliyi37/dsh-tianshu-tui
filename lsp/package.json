@@ -1,7 +1,7 @@
 {
   "name": "@huiliyi37/dsh-lsp",
   "description": "dsh-lsp: LSP model tool surface for the DeepSeek Harness — goto-definition / find-references / diagnostics tools + a shared 'lsp' service consumed by the dsh-tianshu-tui display bridge (single LSP server set, no double spawn)",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -22,7 +22,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.8",
     "@deepseek-ai/schemastery": "^3.18.1"
   },
   "engines": {
