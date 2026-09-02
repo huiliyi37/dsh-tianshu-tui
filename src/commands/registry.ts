@@ -144,7 +144,7 @@ interface MemoryFacet {
  * TuiApp 的显隐切换）；/status、/todos 保持 TuiApp 内注册（/todos：无参显隐 +
  * all 明细展开，数据源为 todos 投影保留快照）。
  */
-export const BUILTIN_COMMAND_NAMES = ['theme', 'session', 'fork', 'branch', 'clear', 'scroll', 'compact', 'steer', 'model', 'effort', 'key', 'login', 'preset', 'tasks', 'density', 'glance', 'info', 'changelog', 'goal', 'status', 'todos', 'subagents', 'workflow', 'config', 'skills', 'rewind', 'btw', 'doctor', 'mcp', 'remember', 'memory', 'export', 'exit', 'restart', 'update', 'yolo', 'help', 'cost', 'vim'] as const
+export const BUILTIN_COMMAND_NAMES = ['theme', 'session', 'fork', 'branch', 'clear', 'scroll', 'compact', 'steer', 'model', 'effort', 'key', 'login', 'preset', 'tasks', 'density', 'glance', 'info', 'changelog', 'goal', 'status', 'todos', 'subagents', 'workflow', 'config', 'skills', 'rewind', 'btw', 'doctor', 'mcp', 'remember', 'memory', 'export', 'exit', 'restart', 'update', 'yolo', 'help', 'cost', 'vim', 'welcome'] as const
 
 /**
  * 最小唯一前缀解析：`/` 前缀 + 命令名 `startsWith` 匹配。

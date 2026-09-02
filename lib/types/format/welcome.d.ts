@@ -88,3 +88,37 @@ export interface FormatWelcomeHeroInput {
  * @returns ANSI 行数组；width ≤ 0 返回空数组。
  */
 export declare function formatWelcomeHero(input: FormatWelcomeHeroInput, theme: RivetTheme): string[];
+/** star 标题块宽度：standard 宽档 / mini 窄档（生成物实测，welcome-title-frames.ts）。 */
+export declare const STAR_TITLE_MAX_COLS: number;
+export declare const STAR_TITLE_MIN_COLS: number;
+/** star hero 宽屏门禁最小列数（gutter + 画 + 间隙 + 标题窄档）。 */
+export declare const STAR_HERO_MIN_COLS: number;
+/** star hero 矮屏门禁最小行数（右栏约 20 行 + 顶栏/输入轨呼吸）。 */
+export declare const STAR_HERO_MIN_ROWS = 24;
+/** formatStarWelcomeHero 的渲染输入。 */
+export interface FormatStarWelcomeHeroInput {
+    width: number;
+    /** 终端行数（矮屏门禁）。 */
+    rows: number;
+    /** 已渲染的抱星鲸鱼行（空数组 = 画已降级 → 整体回落 retro）。 */
+    whale: readonly string[];
+    env: WelcomeEnvCheck;
+    tips: readonly WelcomeTipItem[];
+    /** 插件版本号（附在 @tianshu 标识行尾）。 */
+    version?: string;
+    /** 颜色能力等级（缺省 chalk.level）；0 不出画（艺术字/像素画无色无层次）。 */
+    colorLevel?: number;
+}
+/**
+ * star 模式欢迎英雄区：左抱星鲸鱼 + 右艺术字标题块（DeepSeek» /
+ * < Harness > / @tianshu·版本 / 环境行 / Tips）zip。左栏相对右栏垂直居中。
+ * 标题艺术字两档伸缩：右栏 ≥ standard 档宽用 standard，否则 mini，mini 也
+ * 放不下（< STAR_TITLE_MIN_COLS）整体回落 retro。
+ * 降级（返回空数组，调用方回落 retro hero）：窄屏（< STAR_HERO_MIN_COLS）、
+ * 矮屏（< STAR_HERO_MIN_ROWS）、无色、legacy conhost full 宽度档、画已降级。
+ * 宽度守恒：任何输出行 displayWidth ≤ width。
+ * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
+ * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
+ * @returns ANSI 行数组；降级时空数组。
+ */
+export declare function formatStarWelcomeHero(input: FormatStarWelcomeHeroInput, theme: RivetTheme): string[];

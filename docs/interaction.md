@@ -89,6 +89,7 @@ dsh-tianshu-tui 的全部交互:快捷键、命令、输入面与交互面板。
 | `/glance [segment]` | 切换 footer metrics 段显隐(如 `/glance cost`;无参查看现状) |
 | `/info` | 切换输入区信息密度: `full` 两行(状态行+指标行, 缺省) / `compact` 仅状态行 / `off` 全关; 持久化 |
 | `/vim [on\|off\|default]` | 切换 vi/vim 编辑键位(`default` 写入启动默认) |
+| `/welcome [star\|retro]` | 切换欢迎页风格(star 新版抱星鲸鱼+艺术字标题 / retro 复古小鲸鱼; 无参查看当前; 下次启动生效) |
 
 ### 认证
 

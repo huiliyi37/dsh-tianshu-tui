@@ -227,8 +227,9 @@ import { BtwController } from '../controllers/btw-controller.js'
 import { SessionManager, resumeModelSelection } from '../controllers/session-manager.js'
 import { InspectSurfaceController } from '../controllers/inspect-surface.js'
 import { renderBtwPanel } from '../format/btw-panel.js'
-import { CHROME_GUTTER, formatWelcomeHero, type WelcomeEnvCheck, type WelcomeTipItem } from '../format/welcome.js'
+import { CHROME_GUTTER, formatStarWelcomeHero, formatWelcomeHero, type WelcomeEnvCheck, type WelcomeTipItem } from '../format/welcome.js'
 import { formatWhaleLogo, WHALE_MIN_ROWS } from '../format/whale.js'
+import { formatStarWhaleLogo } from '../format/whale-star.js'
 import { formatTopBar } from '../format/top-bar.js'
 import { livePresetShort } from '../preset-catalog.js'
 import { formatTurnStatus } from '../format/turn-status.js'
@@ -1063,6 +1064,28 @@ export class TuiApp {
         echo(echoSessionOnly('vim', next ? 'on' : 'off'))
       },
     })
+    // 欢迎页风格：star 新版（抱星鲸鱼 + 艺术字标题）/ retro 复古小鲸鱼。
+    // 欢迎页在启动时已 commit 进 scrollback，运行中不重渲染——落盘下次启动生效。
+    this.slash.register({
+      name: 'welcome',
+      category: '配置',
+      description: '切换欢迎页风格（star 新版 / retro 复古，下次启动生效）',
+      argsHint: '[star|retro]',
+      run: ({ text, echo }) => {
+        const arg = text.trim()
+        if (arg === '') {
+          echo(`欢迎页风格：${this.prefs.welcomeStyle ?? 'star'}（star / retro，下次启动生效）`)
+          return
+        }
+        if (arg !== 'star' && arg !== 'retro') {
+          echo('用法：/welcome 或 /welcome [star|retro]')
+          return
+        }
+        this.prefs.welcomeStyle = arg
+        this.persistPrefs()
+        echo(`欢迎页风格已切换：${arg}（下次启动生效）`)
+      },
+    })
     // 输入区信息密度档位：full 两行（状态行 + 指标行）/ compact 仅状态行 /
     // off 全关。对齐 kimi-code footer 两行分层；持久化（与 /glance 同源）。
     // 注册在 /glance 前——菜单环绕末项契约测试锚定 /glance。
@@ -1473,7 +1496,7 @@ export class TuiApp {
     this.interactionDisposer?.()
     const userQuestions = this.ctx.reflect.get('userQuestions', false) as
       | { registerProvider(provider: { ask(request: unknown): Promise<unknown> }): () => void } | undefined
-    if (userQuestions !== undefined) {
+    if (typeof userQuestions?.registerProvider === 'function') {
       this.interactionDisposer = userQuestions.registerProvider({
         ask: request => this.handleQuestionRequest(request),
       })
@@ -1921,7 +1944,24 @@ export class TuiApp {
       { keyHint: 'shift+tab', label: '模式循环' },
     )
     const ownVersion = readOwnVersion(fileURLToPath(new URL('.', import.meta.url)))
-    for (const line of formatWelcomeHero({ width: cols, whale, env, tips, ...(ownVersion === undefined ? {} : { version: ownVersion }) }, this.theme)) {
+    // 欢迎页风格分流（prefs.welcomeStyle，缺省 star）：star = 抱星鲸鱼 +
+    // 艺术字标题块；门禁不满足（窄/矮/无色/full 档）或 retro 配置 → 现行为。
+    let hero: string[] = []
+    if ((this.prefs.welcomeStyle ?? 'star') === 'star') {
+      const starWhale = formatStarWhaleLogo({ width: cols, rows: this.stdout.rows })
+      hero = formatStarWelcomeHero({
+        width: cols,
+        rows: this.stdout.rows,
+        whale: starWhale,
+        env,
+        tips,
+        ...(ownVersion === undefined ? {} : { version: ownVersion }),
+      }, this.theme)
+    }
+    if (hero.length === 0) {
+      hero = formatWelcomeHero({ width: cols, whale, env, tips, ...(ownVersion === undefined ? {} : { version: ownVersion }) }, this.theme)
+    }
+    for (const line of hero) {
       commitLine(line)
     }
     // 空行收尾：命令回显（如「模型已切换」）与欢迎页在视觉上自然分离。

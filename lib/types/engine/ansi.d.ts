@@ -123,6 +123,15 @@ export declare function hexToRgb(hex: string): [number, number, number] | null;
  * @returns xterm-256 调色板索引（16-255）
  */
 export declare function rgbToXterm256(r: number, g: number, b: number): number;
+/**
+ * RGB → 最近 ANSI16 chalk 命名色（2:4:3 感知加权；16 色档像素画近似用，
+ * 调色板变更无需手维护近似表——whale-star level 1 轨）。
+ * @param r - 红色分量（0-255）
+ * @param g - 绿色分量（0-255）
+ * @param b - 蓝色分量（0-255）
+ * @returns chalk 命名色（NAMED_FG_CODES 覆盖的 16 色之一）
+ */
+export declare function rgbToAnsi16Name(r: number, g: number, b: number): string;
 /** 纯函数：给定 env 是否请求无色（便于测试注入）。 */
 export declare function noColorRequested(env?: NodeJS.ProcessEnv): boolean;
 /**

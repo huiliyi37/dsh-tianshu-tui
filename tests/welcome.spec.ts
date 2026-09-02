@@ -207,6 +207,20 @@ describe('formatWelcomeHero（左品牌 + 右 tips）', () => {
     expect(lines[0]!).not.toContain('Tips')
   })
 
+  it('retro 鲸鱼行全剥前导空格（RELEASE 形态锁定：indent + 画内空格一并剥）', () => {
+    // 48 列居中缩进 + 2 列画内空格：retro 历史行为是全剥（块字符落到画首），
+    // star 才按 stripIndent 只剥缩进——两路径分离，互不受波。
+    const whaleWithIndent = [
+      `${' '.repeat(50)}  ██`,
+      `${' '.repeat(50)}▄████`,
+    ]
+    const lines = plain(formatWelcomeHero({
+      width: 100, whale: whaleWithIndent, env, tips: tips(),
+    }, fakeTheme()))
+    const first = lines.find(l => /[█▄]/.test(l))!
+    expect(first.indexOf('█')).toBeLessThanOrEqual(CHROME_GUTTER + 1)
+  })
+
   it('宽度守恒', () => {
     for (const width of [100, 80, 72, 40, 20]) {
       const lines = formatWelcomeHero({ width, whale, env, tips: tips() }, fakeTheme())

@@ -201,6 +201,42 @@ function use256(): boolean {
   return chalk.level === 2
 }
 
+/** 标准 ANSI16 调色板 RGB（与 NAMED_FG_CODES 码序一致：30-37、90-97）。 */
+const ANSI16_RGB: readonly (readonly [number, number, number])[] = [
+  [0, 0, 0], [205, 0, 0], [0, 205, 0], [205, 205, 0],
+  [0, 0, 238], [205, 0, 205], [0, 205, 205], [229, 229, 229],
+  [127, 127, 127], [255, 0, 0], [0, 255, 0], [255, 255, 0],
+  [92, 92, 255], [255, 0, 255], [0, 255, 255], [255, 255, 255],
+]
+
+/** 码序 → chalk 命名色（与 NAMED_FG_CODES 互逆）。 */
+const ANSI16_NAMES = [
+  'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
+  'blackBright', 'redBright', 'greenBright', 'yellowBright',
+  'blueBright', 'magentaBright', 'cyanBright', 'whiteBright',
+] as const
+
+/**
+ * RGB → 最近 ANSI16 chalk 命名色（2:4:3 感知加权；16 色档像素画近似用，
+ * 调色板变更无需手维护近似表——whale-star level 1 轨）。
+ * @param r - 红色分量（0-255）
+ * @param g - 绿色分量（0-255）
+ * @param b - 蓝色分量（0-255）
+ * @returns chalk 命名色（NAMED_FG_CODES 覆盖的 16 色之一）
+ */
+export function rgbToAnsi16Name(r: number, g: number, b: number): string {
+  let best = 0
+  let bestDist = Number.POSITIVE_INFINITY
+  for (let i = 0; i < ANSI16_RGB.length; i++) {
+    /* v8 ignore next -- 常量表长 16，下标 0..15 恒在界内；noUncheckedIndexedAccess 收窄防御 */
+    const c = ANSI16_RGB[i] ?? [0, 0, 0]
+    const d = 2 * (r - c[0]) ** 2 + 4 * (g - c[1]) ** 2 + 3 * (b - c[2]) ** 2
+    if (d < bestDist) { best = i; bestDist = d }
+  }
+  /* v8 ignore next -- 常量表长 16，best ∈ 0..15 恒在界内 */
+  return ANSI16_NAMES[best] ?? 'white'
+}
+
 // ── NO_COLOR（no-color.org 规范：环境变量存在且非空字符串 → 禁用颜色）──
 
 /** 纯函数：给定 env 是否请求无色（便于测试注入）。 */

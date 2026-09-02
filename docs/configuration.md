@@ -58,6 +58,7 @@ TUI 的启动默认存在 `prefs.json`;带参 `/theme` `/density` `/preset` 默�
 - **`prefs.json`** — 启动默认主题(含 `custom:` 与 `auto`)、密度、agent 预设,
   `/subagents` `/workflow` 常驻面板显隐、`/glance` 隐藏的 metrics 段、
   系统通知(`notifyOs`,缺省开)、历史建议 ghost(`ghostSuggest`,缺省开)、
+  欢迎页风格(`welcomeStyle`:`star` 新版抱星鲸鱼,缺省 / `retro` 复古小鲸鱼)、
   scrollback 行数上限(`scrollbackMaxLines`,缺省 1000——调高增加内存与
   回放/快照成本)。损坏/缺失静默回到缺省;删文件即恢复出厂。
 - **`input-history.json`** — 输入框历史(上限 1000 条,Ctrl+P/N 翻阅)。

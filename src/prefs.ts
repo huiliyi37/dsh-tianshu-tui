@@ -26,6 +26,10 @@ export type PersistedPanel = (typeof PERSISTED_PANELS)[number]
 export const FOOTER_INFO_LEVELS = ['full', 'compact', 'off'] as const
 export type FooterInfoLevel = (typeof FOOTER_INFO_LEVELS)[number]
 
+/** 欢迎页风格档位：star 新版抱星鲸鱼 / retro 复古小鲸鱼。 */
+export const WELCOME_STYLES = ['star', 'retro'] as const
+export type WelcomeStyle = (typeof WELCOME_STYLES)[number]
+
 /** 偏好文件形状（全部可选；未知 key 读取时丢弃，前向兼容）。 */
 export interface TuiPrefs {
   /** 主题名（内置名 | custom:<name> | 'auto'）。 */
@@ -52,6 +56,8 @@ export interface TuiPrefs {
   ghostSuggest?: boolean
   /** scrollback 缓冲行数上限（缺省 1000；调高增加内存与 replay 成本）。 */
   scrollbackMaxLines?: number
+  /** 欢迎页风格（缺省 star 新版；retro 复古小鲸鱼；/welcome 切换，下次启动生效）。 */
+  welcomeStyle?: WelcomeStyle
 }
 
 /** 缺省偏好（= 现行为）。 */
@@ -85,6 +91,9 @@ export function parsePrefs(text: string): TuiPrefs {
   }
   if (typeof obj.notifyOs === 'boolean') prefs.notifyOs = obj.notifyOs
   if (typeof obj.ghostSuggest === 'boolean') prefs.ghostSuggest = obj.ghostSuggest
+  if (typeof obj.welcomeStyle === 'string' && (WELCOME_STYLES as readonly string[]).includes(obj.welcomeStyle)) {
+    prefs.welcomeStyle = obj.welcomeStyle as WelcomeStyle
+  }
   if (typeof obj.scrollbackMaxLines === 'number'
     && Number.isInteger(obj.scrollbackMaxLines)
     && obj.scrollbackMaxLines >= 1) {

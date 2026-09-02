@@ -6,10 +6,13 @@
  * 由 format/input-frame 承担，本模块只出欢迎块。
  * 宽度守恒：任何输入下每行显示宽度 ≤ width。
  */
+import chalk from 'chalk'
 import { color } from '../engine/ansi.js'
 import type { RivetTheme } from '../theme.js'
-import { displayWidth, truncateToDisplayWidth } from '../width.js'
+import { ambiguousWidthMode, displayWidth, truncateToDisplayWidth } from '../width.js'
 import { WHALE_COLS } from './whale.js'
+import { STAR_WHALE_COLS } from './whale-star.js'
+import { STAR_TITLE_ART } from './welcome-title-frames.js'
 
 function truncateTo(text: string, columns: number): string {
   let out = ''
@@ -33,7 +36,18 @@ function padTo(text: string, width: number): string {
   return `${text}${' '.repeat(width - w)}`
 }
 
-/** 鲸鱼行前导空格（居中 indent）在左栏 zip 前剥掉；ANSI 码在空格之后。 */
+/** 鲸鱼行剥离恰好 indent 列居中缩进（居中由 format*WhaleLogo 烘焙进每行）。
+ * 只剥缩进、不动画内前导空格——画内空格是构图（星芒/气泡/喷水位置），
+ * 一并剥掉会把右侧内容甩到左缘（stripLeadingSpaces 曾把星图撕散）。
+ * 仅 star 鲸鱼用；retro 见 stripLeadingSpaces。 */
+function stripIndent(line: string, indent: number): string {
+  let i = 0
+  while (i < line.length && i < indent && line[i] === ' ') i++
+  return line.slice(i)
+}
+
+/** retro 鲸鱼行全剥前导空格——RELEASE 起 retro 的既有形态（左对齐紧凑），
+ * CHANGELOG 承诺 retro 画与此前逐字节一致，不可因 star 修复波及。 */
 function stripLeadingSpaces(line: string): string {
   let i = 0
   while (i < line.length && line[i] === ' ') i++
@@ -240,6 +254,96 @@ export function formatWelcomeHero(input: FormatWelcomeHeroInput, theme: RivetThe
 
   const rightCol = formatWelcomeTips({ width: rightW, items: tips, align: 'left' }, theme)
   const rows = Math.max(leftCol.length, rightCol.length)
+  const gap = ' '.repeat(HERO_GAP)
+  const pad = ' '.repeat(gutter)
+  const out: string[] = []
+  for (let i = 0; i < rows; i++) {
+    const left = padTo(leftCol[i] ?? '', leftW)
+    const right = rightCol[i] ?? ''
+    out.push(truncateToDisplayWidth(`${pad}${left}${gap}${right}`, width))
+  }
+  return out
+}
+
+/** star 标题块宽度：standard 宽档 / mini 窄档（生成物实测，welcome-title-frames.ts）。 */
+export const STAR_TITLE_MAX_COLS = STAR_TITLE_ART.standard.width
+export const STAR_TITLE_MIN_COLS = STAR_TITLE_ART.mini.width
+
+/** star hero 宽屏门禁最小列数（gutter + 画 + 间隙 + 标题窄档）。 */
+export const STAR_HERO_MIN_COLS = CHROME_GUTTER + STAR_WHALE_COLS + HERO_GAP + STAR_TITLE_MIN_COLS
+
+/** star hero 矮屏门禁最小行数（右栏约 20 行 + 顶栏/输入轨呼吸）。 */
+export const STAR_HERO_MIN_ROWS = 24
+
+/** formatStarWelcomeHero 的渲染输入。 */
+export interface FormatStarWelcomeHeroInput {
+  width: number
+  /** 终端行数（矮屏门禁）。 */
+  rows: number
+  /** 已渲染的抱星鲸鱼行（空数组 = 画已降级 → 整体回落 retro）。 */
+  whale: readonly string[]
+  env: WelcomeEnvCheck
+  tips: readonly WelcomeTipItem[]
+  /** 插件版本号（附在 @tianshu 标识行尾）。 */
+  version?: string
+  /** 颜色能力等级（缺省 chalk.level）；0 不出画（艺术字/像素画无色无层次）。 */
+  colorLevel?: number
+}
+
+/**
+ * star 模式欢迎英雄区：左抱星鲸鱼 + 右艺术字标题块（DeepSeek» /
+ * < Harness > / @tianshu·版本 / 环境行 / Tips）zip。左栏相对右栏垂直居中。
+ * 标题艺术字两档伸缩：右栏 ≥ standard 档宽用 standard，否则 mini，mini 也
+ * 放不下（< STAR_TITLE_MIN_COLS）整体回落 retro。
+ * 降级（返回空数组，调用方回落 retro hero）：窄屏（< STAR_HERO_MIN_COLS）、
+ * 矮屏（< STAR_HERO_MIN_ROWS）、无色、legacy conhost full 宽度档、画已降级。
+ * 宽度守恒：任何输出行 displayWidth ≤ width。
+ * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
+ * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
+ * @returns ANSI 行数组；降级时空数组。
+ */
+export function formatStarWelcomeHero(input: FormatStarWelcomeHeroInput, theme: RivetTheme): string[] {
+  const { width, whale, tips } = input
+  if (width <= 0) return []
+  if (width < STAR_HERO_MIN_COLS || input.rows < STAR_HERO_MIN_ROWS) return []
+  if (whale.length === 0) return []
+  const level = input.colorLevel ?? chalk.level
+  if (level < 1) return []
+  if (ambiguousWidthMode() === 'full') return []
+
+  const env = { ...input.env, cols: width }
+  const gutter = CHROME_GUTTER
+  const inner = width - gutter
+  const whaleIndent = Math.max(0, Math.floor((width - STAR_WHALE_COLS) / 2))
+  const whaleStripped = whale.map(l => stripIndent(l, whaleIndent))
+  let leftW = 0
+  for (const line of whaleStripped) leftW = Math.max(leftW, displayWidth(line))
+  const rightW = inner - leftW - HERO_GAP
+  if (rightW < STAR_TITLE_MIN_COLS) return []
+
+  // 标题艺术字按右栏宽度选档（standard 放不下换 mini，mini 再放不下整体回落 retro）。
+  const art = rightW >= STAR_TITLE_MAX_COLS ? STAR_TITLE_ART.standard : STAR_TITLE_ART.mini
+  const rightCol: string[] = []
+  for (const line of art.title) rightCol.push(color(line, theme.brandColor, { bold: true }))
+  rightCol.push('')
+  for (const line of art.subtitle) rightCol.push(color(line, theme.secondary))
+  const tag = `@tianshu${input.version === undefined ? '' : ` · v${input.version}`}`
+  rightCol.push(color(truncateTo(tag, rightW), theme.muted))
+  rightCol.push('')
+  rightCol.push(...formatEnvCheckLine({ ...env, cols: rightW, align: 'left' }, theme))
+  rightCol.push('')
+  rightCol.push(...formatWelcomeTips({ width: rightW, items: tips, align: 'left' }, theme))
+
+  // 左栏垂直对齐：以品牌块（标题 + 副标 + 标识行）为锚居中——按整根右栏
+  // （含 Tips）居中会让画明显低于标题视觉中心，观感「歪」。画比品牌块高时
+  // topPad=0，画顶对齐标题顶。
+  const rows = Math.max(whaleStripped.length, rightCol.length)
+  const brandRows = art.title.length + 1 + art.subtitle.length + 1
+  const topPad = Math.max(0, Math.floor((brandRows - whaleStripped.length) / 2))
+  const leftCol: string[] = []
+  for (let i = 0; i < topPad; i++) leftCol.push('')
+  leftCol.push(...whaleStripped)
+
   const gap = ' '.repeat(HERO_GAP)
   const pad = ' '.repeat(gutter)
   const out: string[] = []
