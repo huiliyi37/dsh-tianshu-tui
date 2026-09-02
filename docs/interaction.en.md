@@ -91,7 +91,7 @@ Above the input track, running work folds into one activity band (`◐ N subagen
 | `/glance [segment]` | Toggle footer metrics segments (e.g. `/glance cost`; no args shows current state) |
 | `/info` | Cycle input-area info density: `full` two lines (status + metrics, default) / `compact` status line only / `off`; persisted |
 | `/vim [on\|off\|default]` | Toggle vi/vim editing keybindings (`default` persists as startup default) |
-| `/welcome [star\|retro]` | Switch welcome page style (star=new whale-and-star + pixel title / retro=classic small whale; no args=show current; takes effect on next launch) |
+| `/welcome [blue\|star\|retro]` | Switch welcome page style (blue=blue whale holding star + block title, default / star=purple whale + pixel title / retro=classic small whale; no args=show current; takes effect on next launch) |
 
 ### Authentication
 

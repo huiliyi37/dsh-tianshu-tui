@@ -133,6 +133,8 @@
 | src/format/welcome-title-frames.ts | — | new（生成物：star 标题 figlet 艺术字两档（Standard/Mini）；scripts/generate-welcome-title.mjs 产出，勿手改） |
 | src/format/whale-star-frames.ts | — | new（生成物：star 鲸鱼 44×34 索引像素 + 15 色板；scripts/generate-welcome-star.mjs 由 assets/welcome-star-source.png（字幕带已切除）产出，勿手改；44 列为 ambiguous 宽渲染终端的折行安全上限） |
 | src/format/whale-star.ts | — | new（star 欢迎页紫鲸举星像素画：half-block 实色轨 44×17 文本格 + 星光/喷水/白褶肚，品牌固定色 + 色深/宽度档降级（level 1 现场最近邻 ANSI16），纯渲染） |
+| src/format/whale-blue-frames.ts | — | new（生成物：blue 鲸鱼 44×34 索引像素 + 15 色板；scripts/generate-welcome-blue.mjs 由 assets/welcome-blue-source.png（蓝鲸抱星，无字幕带）产出，勿手改） |
+| src/format/whale-blue.ts | — | new（blue 欢迎页（默认）蓝鲸抱星像素画：half-block 实色轨 44×17 文本格 + 水面倒影/气泡/腮红，品牌固定色 + 色深/宽度档降级，纯渲染） |
 | src/gutter.ts | gutter.ts | ported |
 | src/git-status.ts | — | new（git 仓库探测三函数：isGitRepo/gitBranch/gitDirtyCount，exec 注入；C4 自 ui/app.ts 提取） |
 | src/index.ts | — | new |

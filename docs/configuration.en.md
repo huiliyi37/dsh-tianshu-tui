@@ -55,7 +55,7 @@ This package's `cordis.patch.yml` inserts official `agent-presets` (`default: st
 | `/model [target] [effort] [default]` | View/switch model (Enter/args=this session; S or `default`=startup default) |
 | `/effort off\|high\|max\|auto\|default` | Reasoning effort (args=this session; S or `default`=startup default) |
 | `/preset [name] [default]` | Switch agent preset (args=this session; trailing `default`=new-session startup default) |
-| `/welcome [star\|retro]` | Switch welcome page style (`star` new whale-and-star + pixel title, default / `retro` classic small whale; no args=show current; takes effect on next launch) |
+| `/welcome [blue\|star\|retro]` | Switch welcome page style (`blue` blue-whale-holding-star + block title, default / `star` purple whale + pixel title / `retro` classic small whale; no args=show current; takes effect on next launch) |
 | `/yolo [on\|off]` | Always-approve mode (equivalent to Shift+Tab into always-approve) |
 | `Shift+Tab` | Mode cycle: normal → plan → always-approve |
 

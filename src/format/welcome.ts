@@ -12,7 +12,8 @@ import type { RivetTheme } from '../theme.js'
 import { ambiguousWidthMode, displayWidth, truncateToDisplayWidth } from '../width.js'
 import { WHALE_COLS } from './whale.js'
 import { STAR_WHALE_COLS } from './whale-star.js'
-import { STAR_TITLE_ART } from './welcome-title-frames.js'
+import { BLUE_WHALE_COLS } from './whale-blue.js'
+import { BLUE_TITLE_ART, STAR_TITLE_ART, type StarTitleArtVariant } from './welcome-title-frames.js'
 
 function truncateTo(text: string, columns: number): string {
   let out = ''
@@ -275,7 +276,17 @@ export const STAR_HERO_MIN_COLS = CHROME_GUTTER + STAR_WHALE_COLS + HERO_GAP + S
 /** star hero 矮屏门禁最小行数（右栏约 20 行 + 顶栏/输入轨呼吸）。 */
 export const STAR_HERO_MIN_ROWS = 24
 
-/** formatStarWelcomeHero 的渲染输入。 */
+/** blue 标题块宽度：wide（ANSI Shadow）/ mid（Standard）/ mini（Mini），生成物实测。 */
+export const BLUE_TITLE_MAX_COLS = BLUE_TITLE_ART.wide.width
+export const BLUE_TITLE_MIN_COLS = BLUE_TITLE_ART.mini.width
+
+/** blue hero 宽屏门禁最小列数（与 star 同构：gutter + 画 + 间隙 + 标题窄档）。 */
+export const BLUE_HERO_MIN_COLS = CHROME_GUTTER + BLUE_WHALE_COLS + HERO_GAP + BLUE_TITLE_MIN_COLS
+
+/** blue hero 矮屏门禁最小行数（同 star）。 */
+export const BLUE_HERO_MIN_ROWS = 24
+
+/** formatStarWelcomeHero / formatBlueWelcomeHero 的渲染输入。 */
 export interface FormatStarWelcomeHeroInput {
   width: number
   /** 终端行数（矮屏门禁）。 */
@@ -290,22 +301,34 @@ export interface FormatStarWelcomeHeroInput {
   colorLevel?: number
 }
 
+/** formatBlueWelcomeHero 的渲染输入（与 star 同形）。 */
+export type FormatBlueWelcomeHeroInput = FormatStarWelcomeHeroInput
+
+/** 像素画 hero 规格：画宽 + 标题艺术字档位 + 门禁（star/blue 共用布局）。 */
+interface PixelHeroSpec {
+  /** 像素画文本列数（居中缩进计算基准）。 */
+  readonly whaleCols: number
+  /** 标题艺术字档位（宽→窄；运行时取首个右栏放得下的档）。 */
+  readonly artTiers: readonly StarTitleArtVariant[]
+  /** 宽屏门禁最小列数。 */
+  readonly minCols: number
+  /** 矮屏门禁最小行数。 */
+  readonly minRows: number
+}
+
 /**
- * star 模式欢迎英雄区：左抱星鲸鱼 + 右艺术字标题块（DeepSeek» /
- * < Harness > / @tianshu·版本 / 环境行 / Tips）zip。左栏相对右栏垂直居中。
- * 标题艺术字两档伸缩：右栏 ≥ standard 档宽用 standard，否则 mini，mini 也
- * 放不下（< STAR_TITLE_MIN_COLS）整体回落 retro。
- * 降级（返回空数组，调用方回落 retro hero）：窄屏（< STAR_HERO_MIN_COLS）、
- * 矮屏（< STAR_HERO_MIN_ROWS）、无色、legacy conhost full 宽度档、画已降级。
+ * 像素画欢迎英雄区（star/blue 共用布局）：左鲸鱼 + 右艺术字标题块
+ * （主标 / 副标 / @tianshu·版本 / 环境行 / Tips）zip。左栏相对右栏
+ * 以品牌块为锚垂直居中。标题艺术字按右栏宽度宽→窄取首个放得下的档，
+ * 最窄档也放不下整体回落 retro。
+ * 降级（返回空数组，调用方回落 retro hero）：窄屏、矮屏、无色、
+ * legacy conhost full 宽度档、画已降级。
  * 宽度守恒：任何输出行 displayWidth ≤ width。
- * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
- * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
- * @returns ANSI 行数组；降级时空数组。
  */
-export function formatStarWelcomeHero(input: FormatStarWelcomeHeroInput, theme: RivetTheme): string[] {
+function formatPixelWelcomeHero(input: FormatStarWelcomeHeroInput, theme: RivetTheme, spec: PixelHeroSpec): string[] {
   const { width, whale, tips } = input
   if (width <= 0) return []
-  if (width < STAR_HERO_MIN_COLS || input.rows < STAR_HERO_MIN_ROWS) return []
+  if (width < spec.minCols || input.rows < spec.minRows) return []
   if (whale.length === 0) return []
   const level = input.colorLevel ?? chalk.level
   if (level < 1) return []
@@ -314,15 +337,14 @@ export function formatStarWelcomeHero(input: FormatStarWelcomeHeroInput, theme: 
   const env = { ...input.env, cols: width }
   const gutter = CHROME_GUTTER
   const inner = width - gutter
-  const whaleIndent = Math.max(0, Math.floor((width - STAR_WHALE_COLS) / 2))
+  const whaleIndent = Math.max(0, Math.floor((width - spec.whaleCols) / 2))
   const whaleStripped = whale.map(l => stripIndent(l, whaleIndent))
   let leftW = 0
   for (const line of whaleStripped) leftW = Math.max(leftW, displayWidth(line))
   const rightW = inner - leftW - HERO_GAP
-  if (rightW < STAR_TITLE_MIN_COLS) return []
-
-  // 标题艺术字按右栏宽度选档（standard 放不下换 mini，mini 再放不下整体回落 retro）。
-  const art = rightW >= STAR_TITLE_MAX_COLS ? STAR_TITLE_ART.standard : STAR_TITLE_ART.mini
+  // 标题艺术字按右栏宽度选档：宽→窄取首个放得下的档；最窄档也放不下整体回落 retro。
+  const art = spec.artTiers.find(t => rightW >= t.width)
+  if (art === undefined) return []
   const rightCol: string[] = []
   for (const line of art.title) rightCol.push(color(line, theme.brandColor, { bold: true }))
   rightCol.push('')
@@ -353,4 +375,40 @@ export function formatStarWelcomeHero(input: FormatStarWelcomeHeroInput, theme: 
     out.push(truncateToDisplayWidth(`${pad}${left}${gap}${right}`, width))
   }
   return out
+}
+
+/**
+ * star 模式欢迎英雄区：左抱星鲸鱼（紫）+ 右艺术字标题块（DeepSeek» /
+ * < Harness > / @tianshu·版本 / 环境行 / Tips）zip。布局/降级矩阵见
+ * formatPixelWelcomeHero；门禁常量 STAR_HERO_MIN_COLS / STAR_HERO_MIN_ROWS。
+ * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
+ * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
+ * @returns ANSI 行数组；降级时空数组。
+ */
+export function formatStarWelcomeHero(input: FormatStarWelcomeHeroInput, theme: RivetTheme): string[] {
+  return formatPixelWelcomeHero(input, theme, {
+    whaleCols: STAR_WHALE_COLS,
+    artTiers: [STAR_TITLE_ART.standard, STAR_TITLE_ART.mini],
+    minCols: STAR_HERO_MIN_COLS,
+    minRows: STAR_HERO_MIN_ROWS,
+  })
+}
+
+/**
+ * blue 模式欢迎英雄区（默认风格）：左蓝鲸抱星 + 右 ANSI Shadow 艺术字
+ * 标题块（DeepSeek / < Harness > / @tianshu·版本 / 环境行 / Tips）zip。
+ * 标题三档伸缩：ANSI Shadow（64）→ Standard（44）→ Mini（33）。
+ * 布局/降级矩阵见 formatPixelWelcomeHero；门禁常量 BLUE_HERO_MIN_COLS /
+ * BLUE_HERO_MIN_ROWS。
+ * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
+ * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
+ * @returns ANSI 行数组；降级时空数组。
+ */
+export function formatBlueWelcomeHero(input: FormatBlueWelcomeHeroInput, theme: RivetTheme): string[] {
+  return formatPixelWelcomeHero(input, theme, {
+    whaleCols: BLUE_WHALE_COLS,
+    artTiers: [BLUE_TITLE_ART.wide, BLUE_TITLE_ART.mid, BLUE_TITLE_ART.mini],
+    minCols: BLUE_HERO_MIN_COLS,
+    minRows: BLUE_HERO_MIN_ROWS,
+  })
 }

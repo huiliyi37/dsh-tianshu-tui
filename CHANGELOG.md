@@ -5,12 +5,13 @@
 
 ## [Unreleased]
 
-欢迎页双模式：新版「抱星鲸鱼 + 艺术字大标题」默认登场，原小鲸鱼保留为复古模式可切换。
+欢迎页三模式：blue「蓝鲸抱星 + 艺术字大标题」默认登场，star「紫鲸举星 + 艺术字标题」与 retro 复古小鲸鱼可切换。
 
-- **star 新版欢迎页（默认）** — 左：品牌像素画（紫罗兰鲸鱼托举光晕金星、头顶喷水花、白褶肚与青鳍，44×34 索引像素自 8-22 品牌原图经生成管线产出（44 列 = omts 同款上限：块字符在 ambiguous 宽渲染终端占 2 列，88 列内不折行）——字幕带切除 + 原生像素网格最近邻复原，`scripts/generate-welcome-star.mjs` → `format/whale-star-frames.ts`，median-cut 9 主色 + 锚定 6 关键色 15 色板；精细化后处理（8 邻填洞修采样裂缝、眼簇定位补高光点）；half-block 实色双拼渲染（渐变图不用盲文点阵——混色格亮点归前景点/暗点归背景即成麻点，omts 渲染默认 half 档同理），背景透明、品牌固定色）；右：figlet 艺术字标题块（`DeepSeek»` + `< Harness >`，Standard/Mini 两档随右栏宽度伸缩，`scripts/generate-welcome-title.mjs` 生成期固化）+ `@tianshu` 贡献者标识行（附版本号）+ 环境行 + Tips。鲸鱼以品牌块为锚垂直对齐
-- **`/welcome [star|retro]` 切换 + prefs `welcomeStyle` 持久化** — 无参查看当前风格；带参落盘下次启动生效（欢迎页启动时已 commit 进 scrollback，运行中不重渲染）
-- **降级链** — star 门禁（≥79 列宽 / ≥24 行高 / 有色 / 非 legacy 全角档）不满足时整体回落 retro 现行为；窄屏/矮屏/无色终端观感与此前逐字节一致
-- **共享像素渲染核** — `format/pixel-grid.ts`（半块 blitter：whale 复古画与 whale-star 共用，retro 画逐字节不变）；新增 `format/whale-star.ts` 与两条生成管线 `scripts/generate-welcome-star.mjs` → `format/whale-star-frames.ts`、`scripts/generate-welcome-title.mjs` → `format/welcome-title-frames.ts`（均为生成物）
+- **blue 新版欢迎页（默认）** — 左：品牌像素画（蓝鲸抱星，水面倒影/气泡/腮红粉构图，44×34 索引像素自 9-02 品牌原图经生成管线产出（44 列 = omts 同款上限：块字符在 ambiguous 宽渲染终端占 2 列，88 列内不折行）——边缘洪泛抠图 + 逐格统计采样（覆盖率掩码保细线条 + 格内中位色抗噪），`scripts/generate-welcome-blue.mjs` → `format/whale-blue-frames.ts`，median-cut 9 主色 + 锚定 6 关键色（星核/星金/腮红粉/白肚/身体主蓝/高光蓝）15 色板；精细化后处理（8 邻填洞修采样裂缝、最深色中段簇定位眼睛补高光点）；half-block 实色双拼渲染（渐变图不用盲文点阵——混色格亮点归前景点/暗点归背景即成麻点，omts 渲染默认 half 档同理），背景透明、品牌固定色）；右：figlet ANSI Shadow 艺术字标题块（`DeepSeek` + `< Harness >` 纯文本副标，ANSI Shadow 64 / Standard 44 / Mini 33 三档随右栏宽度伸缩，`scripts/generate-welcome-title.mjs` 生成期固化）+ `@tianshu` 贡献者标识行（附版本号）+ 环境行 + Tips。鲸鱼以品牌块为锚垂直对齐
+- **star 紫鲸欢迎页（可切换）** — 同一 hero 布局（`format/welcome.ts` 共享像素画 hero 核）：紫罗兰鲸鱼托举光晕金星（8-22 品牌原图字幕带已切除，`scripts/generate-welcome-star.mjs` → `format/whale-star-frames.ts` 同款管线）+ figlet Standard/Mini 艺术字标题块（`DeepSeek»` + `< Harness >`）
+- **`/welcome [blue|star|retro]` 切换 + prefs `welcomeStyle` 持久化** — 无参查看当前风格；带参落盘下次启动生效（欢迎页启动时已 commit 进 scrollback，运行中不重渲染）
+- **降级链** — blue/star 门禁（分别 ≥82/≥83 列宽、≥24 行高、有色、非 legacy 全角档）不满足时整体回落 retro 现行为；窄屏/矮屏/无色终端观感与此前逐字节一致
+- **共享像素渲染核** — `format/pixel-grid.ts`（半块 blitter：whale 复古画与 whale-star/whale-blue 共用，retro 画逐字节不变）；三条生成管线（`generate-welcome-blue.mjs` / `generate-welcome-star.mjs` / `generate-welcome-title.mjs` → 对应 `format/*-frames.ts` 生成物）
 
 ## [0.1.2-rc.28] - 2026-08-29
 

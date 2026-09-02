@@ -18,8 +18,8 @@ export type PersistedPanel = (typeof PERSISTED_PANELS)[number];
 /** 输入区信息密度档位（footerInfo）：full 两行 / compact 仅状态行 / off 全关。 */
 export declare const FOOTER_INFO_LEVELS: readonly ['full', 'compact', 'off'];
 export type FooterInfoLevel = (typeof FOOTER_INFO_LEVELS)[number];
-/** 欢迎页风格档位：star 新版抱星鲸鱼 / retro 复古小鲸鱼。 */
-export declare const WELCOME_STYLES: readonly ['star', 'retro'];
+/** 欢迎页风格档位：blue 新版蓝鲸抱星（默认）/ star 紫鲸举星 / retro 复古小鲸鱼。 */
+export declare const WELCOME_STYLES: readonly ['blue', 'star', 'retro'];
 export type WelcomeStyle = (typeof WELCOME_STYLES)[number];
 /** 偏好文件形状（全部可选；未知 key 读取时丢弃，前向兼容）。 */
 export interface TuiPrefs {
@@ -49,7 +49,7 @@ export interface TuiPrefs {
     ghostSuggest?: boolean;
     /** scrollback 缓冲行数上限（缺省 1000；调高增加内存与 replay 成本）。 */
     scrollbackMaxLines?: number;
-    /** 欢迎页风格（缺省 star 新版；retro 复古小鲸鱼；/welcome 切换，下次启动生效）。 */
+    /** 欢迎页风格（缺省 blue 蓝鲸新版；star 紫鲸 / retro 复古小鲸鱼；/welcome 切换，下次启动生效）。 */
     welcomeStyle?: WelcomeStyle;
 }
 /** 缺省偏好（= 现行为）。 */

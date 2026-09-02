@@ -69,7 +69,8 @@ describe('parsePrefs 容错', () => {
     expect(parsePrefs(JSON.stringify({ scrollbackMaxLines: '5000' }))).toEqual({})
   })
 
-  it('welcomeStyle 只收白名单两档（star/retro），非法丢弃', () => {
+  it('welcomeStyle 只收白名单三档（blue/star/retro），非法丢弃', () => {
+    expect(parsePrefs(JSON.stringify({ welcomeStyle: 'blue' }))).toEqual({ welcomeStyle: 'blue' })
     expect(parsePrefs(JSON.stringify({ welcomeStyle: 'star' }))).toEqual({ welcomeStyle: 'star' })
     expect(parsePrefs(JSON.stringify({ welcomeStyle: 'retro' }))).toEqual({ welcomeStyle: 'retro' })
     expect(parsePrefs(JSON.stringify({ welcomeStyle: 'classic' }))).toEqual({})

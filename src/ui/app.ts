@@ -227,9 +227,10 @@ import { BtwController } from '../controllers/btw-controller.js'
 import { SessionManager, resumeModelSelection } from '../controllers/session-manager.js'
 import { InspectSurfaceController } from '../controllers/inspect-surface.js'
 import { renderBtwPanel } from '../format/btw-panel.js'
-import { CHROME_GUTTER, formatStarWelcomeHero, formatWelcomeHero, type WelcomeEnvCheck, type WelcomeTipItem } from '../format/welcome.js'
+import { CHROME_GUTTER, formatBlueWelcomeHero, formatStarWelcomeHero, formatWelcomeHero, type WelcomeEnvCheck, type WelcomeTipItem } from '../format/welcome.js'
 import { formatWhaleLogo, WHALE_MIN_ROWS } from '../format/whale.js'
 import { formatStarWhaleLogo } from '../format/whale-star.js'
+import { formatBlueWhaleLogo } from '../format/whale-blue.js'
 import { formatTopBar } from '../format/top-bar.js'
 import { livePresetShort } from '../preset-catalog.js'
 import { formatTurnStatus } from '../format/turn-status.js'
@@ -1064,21 +1065,22 @@ export class TuiApp {
         echo(echoSessionOnly('vim', next ? 'on' : 'off'))
       },
     })
-    // 欢迎页风格：star 新版（抱星鲸鱼 + 艺术字标题）/ retro 复古小鲸鱼。
+    // 欢迎页风格：blue 默认（蓝鲸抱星 + ANSI Shadow 艺术字标题）/
+    // star 紫鲸举星 / retro 复古小鲸鱼。
     // 欢迎页在启动时已 commit 进 scrollback，运行中不重渲染——落盘下次启动生效。
     this.slash.register({
       name: 'welcome',
       category: '配置',
-      description: '切换欢迎页风格（star 新版 / retro 复古，下次启动生效）',
-      argsHint: '[star|retro]',
+      description: '切换欢迎页风格（blue 默认 / star 紫鲸 / retro 复古，下次启动生效）',
+      argsHint: '[blue|star|retro]',
       run: ({ text, echo }) => {
         const arg = text.trim()
         if (arg === '') {
-          echo(`欢迎页风格：${this.prefs.welcomeStyle ?? 'star'}（star / retro，下次启动生效）`)
+          echo(`欢迎页风格：${this.prefs.welcomeStyle ?? 'blue'}（blue / star / retro，下次启动生效）`)
           return
         }
-        if (arg !== 'star' && arg !== 'retro') {
-          echo('用法：/welcome 或 /welcome [star|retro]')
+        if (arg !== 'blue' && arg !== 'star' && arg !== 'retro') {
+          echo('用法：/welcome 或 /welcome [blue|star|retro]')
           return
         }
         this.prefs.welcomeStyle = arg
@@ -1944,10 +1946,22 @@ export class TuiApp {
       { keyHint: 'shift+tab', label: '模式循环' },
     )
     const ownVersion = readOwnVersion(fileURLToPath(new URL('.', import.meta.url)))
-    // 欢迎页风格分流（prefs.welcomeStyle，缺省 star）：star = 抱星鲸鱼 +
-    // 艺术字标题块；门禁不满足（窄/矮/无色/full 档）或 retro 配置 → 现行为。
+    // 欢迎页风格分流（prefs.welcomeStyle，缺省 blue）：blue = 蓝鲸抱星 +
+    // ANSI Shadow 艺术字标题块；star = 紫鲸举星 + 艺术字标题块；
+    // 门禁不满足（窄/矮/无色/full 档）或 retro 配置 → 现行为。
     let hero: string[] = []
-    if ((this.prefs.welcomeStyle ?? 'star') === 'star') {
+    const welcomeStyle = this.prefs.welcomeStyle ?? 'blue'
+    if (welcomeStyle === 'blue') {
+      const blueWhale = formatBlueWhaleLogo({ width: cols, rows: this.stdout.rows })
+      hero = formatBlueWelcomeHero({
+        width: cols,
+        rows: this.stdout.rows,
+        whale: blueWhale,
+        env,
+        tips,
+        ...(ownVersion === undefined ? {} : { version: ownVersion }),
+      }, this.theme)
+    } else if (welcomeStyle === 'star') {
       const starWhale = formatStarWhaleLogo({ width: cols, rows: this.stdout.rows })
       hero = formatStarWelcomeHero({
         width: cols,

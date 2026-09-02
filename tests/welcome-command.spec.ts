@@ -1,5 +1,5 @@
 /**
- * welcome-command.spec.ts — /welcome 斜杠命令（star/retro 切换写 prefs，
+ * welcome-command.spec.ts — /welcome 斜杠命令（blue/star/retro 切换写 prefs，
  * 下次启动生效）与 BUILTIN_COMMAND_NAMES 登记。
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -65,7 +65,7 @@ function runWelcome(app: WelcomeAppAccess, text = ''): string[] {
   return lines
 }
 
-describe('/welcome 命令（star/retro 切换）', () => {
+describe('/welcome 命令（blue/star/retro 切换）', () => {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-welcome-'))
   const prefsPath = join(dir, 'prefs.json')
 
@@ -73,15 +73,16 @@ describe('/welcome 命令（star/retro 切换）', () => {
     try { rmSync(prefsPath) } catch { /* ignore */ }
   })
 
-  it('无参：显示当前风格（缺省 star）与可选值', async () => {
+  it('无参：显示当前风格（缺省 blue）与可选值', async () => {
     const app = makeApp({ prefsPath })
     const out = runWelcome(app).join('')
+    expect(out).toContain('blue')
     expect(out).toContain('star')
     expect(out).toContain('retro')
     await app.dispose()
   })
 
-  it('retro/star 写 prefs 落盘；非法参数不落盘', async () => {
+  it('blue/retro/star 写 prefs 落盘；非法参数不落盘', async () => {
     const app = makeApp({ prefsPath })
 
     runWelcome(app, 'retro')
@@ -90,8 +91,11 @@ describe('/welcome 命令（star/retro 切换）', () => {
     runWelcome(app, 'star')
     expect(JSON.parse(readFileSync(prefsPath, 'utf-8')).welcomeStyle).toBe('star')
 
+    runWelcome(app, 'blue')
+    expect(JSON.parse(readFileSync(prefsPath, 'utf-8')).welcomeStyle).toBe('blue')
+
     runWelcome(app, 'bogus')
-    expect(JSON.parse(readFileSync(prefsPath, 'utf-8')).welcomeStyle).toBe('star')
+    expect(JSON.parse(readFileSync(prefsPath, 'utf-8')).welcomeStyle).toBe('blue')
     await app.dispose()
   })
 

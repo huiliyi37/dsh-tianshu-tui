@@ -95,7 +95,14 @@ export declare const STAR_TITLE_MIN_COLS: number;
 export declare const STAR_HERO_MIN_COLS: number;
 /** star hero 矮屏门禁最小行数（右栏约 20 行 + 顶栏/输入轨呼吸）。 */
 export declare const STAR_HERO_MIN_ROWS = 24;
-/** formatStarWelcomeHero 的渲染输入。 */
+/** blue 标题块宽度：wide（ANSI Shadow）/ mid（Standard）/ mini（Mini），生成物实测。 */
+export declare const BLUE_TITLE_MAX_COLS: number;
+export declare const BLUE_TITLE_MIN_COLS: number;
+/** blue hero 宽屏门禁最小列数（与 star 同构：gutter + 画 + 间隙 + 标题窄档）。 */
+export declare const BLUE_HERO_MIN_COLS: number;
+/** blue hero 矮屏门禁最小行数（同 star）。 */
+export declare const BLUE_HERO_MIN_ROWS = 24;
+/** formatStarWelcomeHero / formatBlueWelcomeHero 的渲染输入。 */
 export interface FormatStarWelcomeHeroInput {
     width: number;
     /** 终端行数（矮屏门禁）。 */
@@ -109,16 +116,25 @@ export interface FormatStarWelcomeHeroInput {
     /** 颜色能力等级（缺省 chalk.level）；0 不出画（艺术字/像素画无色无层次）。 */
     colorLevel?: number;
 }
+/** formatBlueWelcomeHero 的渲染输入（与 star 同形）。 */
+export type FormatBlueWelcomeHeroInput = FormatStarWelcomeHeroInput;
 /**
- * star 模式欢迎英雄区：左抱星鲸鱼 + 右艺术字标题块（DeepSeek» /
- * < Harness > / @tianshu·版本 / 环境行 / Tips）zip。左栏相对右栏垂直居中。
- * 标题艺术字两档伸缩：右栏 ≥ standard 档宽用 standard，否则 mini，mini 也
- * 放不下（< STAR_TITLE_MIN_COLS）整体回落 retro。
- * 降级（返回空数组，调用方回落 retro hero）：窄屏（< STAR_HERO_MIN_COLS）、
- * 矮屏（< STAR_HERO_MIN_ROWS）、无色、legacy conhost full 宽度档、画已降级。
- * 宽度守恒：任何输出行 displayWidth ≤ width。
+ * star 模式欢迎英雄区：左抱星鲸鱼（紫）+ 右艺术字标题块（DeepSeek» /
+ * < Harness > / @tianshu·版本 / 环境行 / Tips）zip。布局/降级矩阵见
+ * formatPixelWelcomeHero；门禁常量 STAR_HERO_MIN_COLS / STAR_HERO_MIN_ROWS。
  * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
  * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
  * @returns ANSI 行数组；降级时空数组。
  */
 export declare function formatStarWelcomeHero(input: FormatStarWelcomeHeroInput, theme: RivetTheme): string[];
+/**
+ * blue 模式欢迎英雄区（默认风格）：左蓝鲸抱星 + 右 ANSI Shadow 艺术字
+ * 标题块（DeepSeek / < Harness > / @tianshu·版本 / 环境行 / Tips）zip。
+ * 标题三档伸缩：ANSI Shadow（64）→ Standard（44）→ Mini（33）。
+ * 布局/降级矩阵见 formatPixelWelcomeHero；门禁常量 BLUE_HERO_MIN_COLS /
+ * BLUE_HERO_MIN_ROWS。
+ * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
+ * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
+ * @returns ANSI 行数组；降级时空数组。
+ */
+export declare function formatBlueWelcomeHero(input: FormatBlueWelcomeHeroInput, theme: RivetTheme): string[];
