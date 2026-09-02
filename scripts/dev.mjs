@@ -96,7 +96,7 @@ if (!process.env.DEEPSEEK_API_KEY) {
 
 if (!existsSync(join(PROFILE_DIR, 'package.json'))) {
   console.log('首次运行：装配 profile tui（dsh-base + 本插件 link: 本仓库）...')
-  const add = run([CLI, 'plugin', '--profile', 'tui', 'add', '@deepseek-ai/dsh-base@0.1.0-rc.8', `link:${ROOT}`])
+  const add = run([CLI, 'plugin', '--profile', 'tui', 'add', '@deepseek-ai/dsh-base@0.1.1-rc.2', `link:${ROOT}`])
   if (add.status !== 0) process.exit(add.status ?? 1)
 }
 
