@@ -85,7 +85,7 @@ function makeSession(id: string): Session {
   return {
     id: id as Session['id'],
     header: { id: id as Session['id'], version: 0, createdAt: 1 },
-    events: [],
+    events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
   } as unknown as Session
 }
 

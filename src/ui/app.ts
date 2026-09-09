@@ -36,11 +36,14 @@ import { fileURLToPath } from 'node:url'
 import { join, resolve } from 'node:path'
 import type { ReadStream, WriteStream } from 'node:tty'
 import type { Context, Events } from '@deepseek-ai/cordis'
-import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
-import type { CallId, TokenUsage } from '@deepseek-ai/dsh-llm'
+import { Session, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
+import type { ToolCallId, TokenUsage } from '@deepseek-ai/dsh-llm'
 import { installModelSelection, type Agent, type AgentHandle, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 // 空类型导入引入 Context 上 agentDefaultModel 服务的声明合并（headless 同款）。
 import type {} from '@deepseek-ai/dsh-agent-default-model'
+// 空类型导入引入 'user-questions/request' waterfall 事件的声明合并（rc.1 wire）。
+import type {} from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import { CommitEngine } from '../engine/commit-engine.js'
 import { ANSI, color, osc52Clipboard } from '../engine/ansi.js'
 import {
@@ -688,7 +691,7 @@ export class TuiApp {
   /** Ctrl+O 展开/收起最近推理块（live 区展示全文；scrollback 保持折叠头行）。 */
   private reasoningExpanded = false
   /** 进行中工具的 presentCall 标题覆盖（callId → title）；result/abort/换会话清理。 */
-  private readonly pendingCallTitles = new Map<CallId, string>()
+  private readonly pendingCallTitles = new Map<ToolCallId, string>()
   private activeSessionId: SessionId | null = null
   private history: string[] = []
   /** P1：本地偏好（~/.dsh-tui/prefs.json；prefsPath null = 禁用——VITEST 密封门）。 */
@@ -1345,6 +1348,17 @@ export class TuiApp {
    */
   async attach(initialSessionId?: SessionId): Promise<void> {
     if (this.disposed) throw new Error('TuiApp already disposed')
+    // 宿主线守卫：本版编译目标即 0.1.2-rc.1 线（Session.events getter 已移除，
+    // 投影走 snapshotEvents）。旧宿主（≤0.1.1-rc.2，含 npm latest 旧钉线）上
+    // 继续跑只会在会话读取路径深处炸 TypeError——启动即 fail-loud 给出可行动
+    // 指引，绝不静默降级。
+    if (typeof Session.prototype.snapshotEvents !== 'function') {
+      throw new Error(
+        'dsh-tianshu-tui 需要 0.1.2-rc.1+ 官方宿主（检测到旧线）。'
+        + '请升级官方 CLI：pnpm dlx @deepseek-ai/dsh@latest（或 @next）；'
+        + '或回退本插件：dsh plugin --profile tui add @huiliyi37/dsh-tianshu-tui@0.1.2-rc.28',
+      )
+    }
     // 宿主服务就绪窗口：cmdlineArgs/appExit 由 launcher 在 boot prepare 提供，
     // 正常时序下 attach 时已就绪（0 等待）；个别宿主 provide 略晚时短窗口补读。
     // 宿主特征 = 任一服务已注册（reflect 非严格可读）——两服务均未注册视为
@@ -1493,16 +1507,14 @@ export class TuiApp {
       finally { this.renderLiveFromTicker = false }
     }, 120)
     this.ticker.unref()
-    // T3.1：userQuestions provider 注册（升级结构化提问；唯一 provider——
-    // 若已存在注册则替换而非叠加）。
+    // T3.1：userQuestions 结构化提问应答（rc.1 wire：registerProvider 已移除，
+    // 改挂 'user-questions/request' waterfall answerer；TUI 是唯一 answerer，
+    // 全量 claim，重叠请求沿用 ASK_CANCELLED 语义拒绝）。事件是 scope-filtered
+    // （dsh-scope：scoped ask 只派发到 agent 作用域链内的监听者），TUI 插件
+    // fiber 不在任何 agent 作用域链上——必须 global 注册才能收到全部请求。
     this.interactionDisposer?.()
-    const userQuestions = this.ctx.reflect.get('userQuestions', false) as
-      | { registerProvider(provider: { ask(request: unknown): Promise<unknown> }): () => void } | undefined
-    if (typeof userQuestions?.registerProvider === 'function') {
-      this.interactionDisposer = userQuestions.registerProvider({
-        ask: request => this.handleQuestionRequest(request),
-      })
-    }
+    this.interactionDisposer = this.ctx.on('user-questions/request', (request, _next) =>
+      this.handleQuestionRequest(request) as Promise<AskUserQuestionAnswer>, { global: true })
     this.attached = true
     if (this.pendingUpdateNotice !== null) {
       this.commitToScrollback({ text: this.pendingUpdateNotice, trailingNewline: true })
@@ -2120,7 +2132,7 @@ export class TuiApp {
       throw new Error('会话不存在，无法导出')
     }
     const target = path ?? join(session.header.cwd ?? process.cwd(), `dsh-export-${session.id}.md`)
-    const markdown = renderSessionExport(session.events, {
+    const markdown = renderSessionExport(session.snapshotEvents(), {
       sessionId: session.id,
       // exactOptionalPropertyTypes：undefined 显式展开（条件展开是正确形态）。
       ...(session.header.cwd !== undefined ? { cwd: session.header.cwd } : {}),
@@ -2346,7 +2358,7 @@ export class TuiApp {
     if (fh === undefined) return { changed: 0, skipped: 0 } // 该会话无快照记录（无写工具调用）
     // 边界后写工具 callId：扫事件日志中 seq > atSeq 的 tool/call
     const postBoundaryIds = new Set<string>()
-    for (const e of session.events) {
+    for (const e of session.snapshotEvents()) {
       if (e.seq <= atSeq) continue
       if (e.type === 'tool/call' && isWriteToolCall(e.data.name)) {
         postBoundaryIds.add(e.data.callId)
@@ -2402,7 +2414,7 @@ export class TuiApp {
         setup: async (agentCtx) => {
           installModelSelection(agentCtx, ref)
           const live = getSession(this.ctx, id)
-          await joinResume(this.ctx, agentCtx, resolvePresetId(live?.header.agentPreset, live?.events))
+          await joinResume(this.ctx, agentCtx, resolvePresetId(live?.header.agentPreset, live?.snapshotEvents()))
         },
       })
     // P3 side conversation：切走时保留旧会话 agent（keepHandle 让渡 registry；
@@ -2446,7 +2458,7 @@ export class TuiApp {
     // 投影层 fold 接线：turn 统计复位（live 事件驱动）；会话汇总从事件日志
     // 重放重建（summarizeSession 即 replay 入口），恢复会话的 /status 立即可用。
     this.turnSummary = emptyTurnSummary(0)
-    this.sessionSummary = summarizeSession(id, session.events)
+    this.sessionSummary = summarizeSession(id, session.snapshotEvents())
     this.transcript = createTranscript(this.ctx, session)
     this.liveAgent = trackAgent(this.ctx, id)
     // Phase 6.2：工作流阶段指示器接入生产消费端——订阅 agent/status + session/event，

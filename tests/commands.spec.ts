@@ -338,7 +338,7 @@ describe('内置命令 — /session', () => {
 
 describe('内置命令 — /session list 会话标题（官方 session/title 事件 fold + fallback）', () => {
   /** 一条带真人用户消息与可选标题事件的 live 会话替身。 */
-  function liveSession(sid: SessionId, question: string, title?: string): { id: SessionId; events: SessionEvent[] } {
+  function liveSession(sid: SessionId, question: string, title?: string): { id: SessionId; events: SessionEvent[]; snapshotEvents(this: { events?: unknown[] }): unknown[] } {
     const events = [
       {
         seq: 1,
@@ -355,7 +355,7 @@ describe('内置命令 — /session list 会话标题（官方 session/title 事
         data: { title, messageSeqs: [1], source: { kind: 'provider', provider: 'session-title-llm' } },
       } as unknown as SessionEvent)
     }
-    return { id: sid, events }
+    return { id: sid, events, snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] } }
   }
 
   function listRows(sid: SessionId, createdAt = 1): Array<{ id: SessionId; header: { id: SessionId; version: number; createdAt: number } }> {
@@ -399,7 +399,7 @@ describe('内置命令 — /session list 会话标题（官方 session/title 事
     const ctx = makeCtx({
       sessions: {
         list: vi.fn(() => listRows(sid)),
-        get: vi.fn(() => ({ id: sid, events: [] })),
+        get: vi.fn(() => ({ id: sid, events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] } })),
       },
     })
     const { args, echo } = makeArgs({ text: 'list', ctx })
@@ -1764,7 +1764,7 @@ describe('内置命令 — /preset（agent 预设模式切换）', () => {
   /** 当前会话 agent 替身（recompose 的 agentCtx + append 落日志）。 */
   function makeAgent(): Agent {
     const append = vi.fn()
-    return { ctx: {}, session: { append } } as unknown as Agent
+    return { ctx: {}, session: { append, events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] } } } as unknown as Agent
   }
 
   it('内置命令集含 /preset 且无前缀冲突', () => {
@@ -1844,17 +1844,17 @@ describe('内置命令 — /preset（agent 预设模式切换）', () => {
     expect(echo).toHaveBeenCalledWith(expect.stringContaining('已设为默认预设'))
   })
 
-  it('/preset ptc 折到官方 id code（花名册无 ptc 行时）', async () => {
+  it('/preset code 折到官方 id ptc（rc.1 起 Code Mode 更名 PTC）', async () => {
     const { cmd, deps } = presetByName()
     const { presets, ctx } = presetCtx()
-    presets.list.mockResolvedValue([{ id: 'code', name: 'PTC 模式' }])
-    presets.recompose.mockResolvedValue({ id: 'code', name: 'PTC 模式' })
+    presets.list.mockResolvedValue([{ id: 'ptc', name: 'PTC 模式' }])
+    presets.recompose.mockResolvedValue({ id: 'ptc', name: 'PTC 模式' })
     const agent = makeAgent()
     deps.currentAgent.mockReturnValue(agent)
     deps.isBlankSession.mockReturnValue(true)
-    const { args } = makeArgs({ text: 'ptc', ctx })
+    const { args } = makeArgs({ text: 'code', ctx })
     await cmd.run(args)
-    expect(presets.recompose).toHaveBeenCalledWith(agent.ctx, 'code')
+    expect(presets.recompose).toHaveBeenCalledWith(agent.ctx, 'ptc')
   })
 
   it('非 blank 会话拒绝切换：不调 recompose / append', async () => {

@@ -8,7 +8,7 @@
  * 去掉天枢特有的星域映射与浏览器调试工具分支。
  */
 
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 
 /** 工具家族：决定截断策略与 diff 分支。 */
 export type ToolFamily = 'read' | 'write' | 'run' | 'find' | 'other'
@@ -159,15 +159,15 @@ export interface ToolTimerEvent {
   type: 'tool-call' | 'tool-result'
   /** Unix epoch ms，与 SessionEvent.time 对齐。 */
   time: number
-  callId: CallId
+  callId: ToolCallId
 }
 
 /** 工具计时状态：进行中（starts）与已定格（finished）的 callId → 时刻/耗时。 */
 export interface ToolTimerState {
   /** callId → tool/call 时刻（ms）。 */
-  readonly starts: ReadonlyMap<CallId, number>
+  readonly starts: ReadonlyMap<ToolCallId, number>
   /** callId → tool/result 定格耗时（ms）。result 后保留，供终态展示。 */
-  readonly finished: ReadonlyMap<CallId, number>
+  readonly finished: ReadonlyMap<ToolCallId, number>
 }
 
 /**
@@ -208,7 +208,7 @@ export function applyToolTimerEvent(state: ToolTimerState, event: ToolTimerEvent
  * @param nowMs - 当前时刻（Unix epoch ms，进行中耗时的参照）。
  * @returns 毫秒耗时；该 callId 从未出现返回 undefined。
  */
-export function toolElapsedMs(state: ToolTimerState, callId: CallId, nowMs: number): number | undefined {
+export function toolElapsedMs(state: ToolTimerState, callId: ToolCallId, nowMs: number): number | undefined {
   const start = state.starts.get(callId)
   if (start !== undefined) return Math.max(0, nowMs - start)
   return state.finished.get(callId)

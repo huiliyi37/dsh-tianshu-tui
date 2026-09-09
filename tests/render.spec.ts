@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type { RivetTheme } from '../src/theme.js'
 import type { TranscriptMessage, TranscriptToolCall, TranscriptView } from '../src/adapter/transcript.js'
@@ -100,7 +100,7 @@ function toolResultEvent(
 
 function tool(callId: string, name: string, args: string, result?: SessionEvent<'tool/result'>, seq = 5): TranscriptToolCall {
   return {
-    callId: callId as CallId,
+    callId: callId as ToolCallId,
     name,
     arguments: args,
     turn: 1,

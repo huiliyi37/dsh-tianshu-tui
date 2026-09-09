@@ -3,7 +3,7 @@
  *
  * 花名册 list() 已有 preset.yml 的 name/description；本表补「工具集 + 能力」
  * 给 /preset 列表与 footer/顶栏短名。id 对齐 CLI
- * apps/cli/config/agent-presets/{standard,code,minimal,cordis}。
+ * apps/cli/config/agent-presets/{standard,ptc,minimal,cordis}（rc.1 起 code → ptc）。
  *
  * @module @huiliyi37/dsh-tianshu-tui/preset-catalog
  */

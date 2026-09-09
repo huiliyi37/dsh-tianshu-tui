@@ -235,7 +235,7 @@ export function createPresetCommand(deps: StartupCommandDeps): SlashCommand {
           : `当前: ${current} · ${presetShortLabel(current)}`
         if (saved !== undefined) currentLine += ` · 启动默认: ${saved}`
         if (agent !== null) {
-          const wire = wireToolNames(agent.session.events)
+          const wire = wireToolNames(agent.session.snapshotEvents())
           const surface = formatWireSurface(wire)
           if (surface !== undefined) {
             const phase = wirePhaseLabel(wire)

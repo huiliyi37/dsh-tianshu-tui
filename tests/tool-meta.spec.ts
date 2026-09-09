@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import {
   applyToolTimerEvent,
   emptyToolTimer,
@@ -129,10 +129,10 @@ describe('isDelegationTool', () => {
 
 describe('ToolTimer 投影', () => {
   function call(id: string, time: number): ToolTimerEvent {
-    return { type: 'tool-call', time, callId: id as CallId }
+    return { type: 'tool-call', time, callId: id as ToolCallId }
   }
   function result(id: string, time: number): ToolTimerEvent {
-    return { type: 'tool-result', time, callId: id as CallId }
+    return { type: 'tool-result', time, callId: id as ToolCallId }
   }
 
   it('call 记录起点；重复 call 以首次为准（no-op）', () => {
@@ -140,15 +140,15 @@ describe('ToolTimer 投影', () => {
     s = applyToolTimerEvent(s, call('c1', 1000))
     const after = applyToolTimerEvent(s, call('c1', 2000))
     expect(after).toBe(s)
-    expect(after.starts.get('c1' as CallId)).toBe(1000)
+    expect(after.starts.get('c1' as ToolCallId)).toBe(1000)
   })
 
   it('result 定格耗时并移出 starts；无起点 no-op（返回原状态）', () => {
     let s = emptyToolTimer()
     s = applyToolTimerEvent(s, call('c1', 1000))
     s = applyToolTimerEvent(s, result('c1', 3500))
-    expect(s.finished.get('c1' as CallId)).toBe(2500)
-    expect(s.starts.has('c1' as CallId)).toBe(false)
+    expect(s.finished.get('c1' as ToolCallId)).toBe(2500)
+    expect(s.starts.has('c1' as ToolCallId)).toBe(false)
     const ghost = applyToolTimerEvent(s, result('ghost', 5000))
     expect(ghost).toBe(s)
   })
@@ -157,15 +157,15 @@ describe('ToolTimer 投影', () => {
     let s = emptyToolTimer()
     s = applyToolTimerEvent(s, call('c1', 5000))
     s = applyToolTimerEvent(s, result('c1', 1000))
-    expect(s.finished.get('c1' as CallId)).toBe(0)
+    expect(s.finished.get('c1' as ToolCallId)).toBe(0)
   })
 
   it('toolElapsedMs：进行中 = now − start；定格 = fixed；未知 = undefined', () => {
     let s = emptyToolTimer()
     s = applyToolTimerEvent(s, call('c1', 1000))
-    expect(toolElapsedMs(s, 'c1' as CallId, 3000)).toBe(2000)
+    expect(toolElapsedMs(s, 'c1' as ToolCallId, 3000)).toBe(2000)
     s = applyToolTimerEvent(s, result('c1', 2500))
-    expect(toolElapsedMs(s, 'c1' as CallId, 9999)).toBe(1500)
-    expect(toolElapsedMs(s, 'ghost' as CallId, 9999)).toBeUndefined()
+    expect(toolElapsedMs(s, 'c1' as ToolCallId, 9999)).toBe(1500)
+    expect(toolElapsedMs(s, 'ghost' as ToolCallId, 9999)).toBeUndefined()
   })
 })

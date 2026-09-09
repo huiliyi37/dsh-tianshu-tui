@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import {
   applySummaryEvent,
   emptySummaryState,
@@ -11,23 +12,23 @@ const sid = 'test-summary-1' as SessionId
 
 function toolCall(seq: number, callId: string, name: string, turn: number, step: number): SessionEvent {
   return {
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/call',
-    data: { callId: callId as CallId, name, arguments: '{}', turn, step },
+    data: { callId: callId as ToolCallId, name, arguments: '{}', turn, step },
   }
 }
 
 function toolResult(seq: number, callId: string, turn: number, step: number, error?: { name: string; code: string }): SessionEvent {
   return {
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/result',
     data: {
       turn,
       step,
       message: {
-        source: { kind: 'tool', callId: callId as CallId },
+        source: { kind: 'tool', callId: callId as ToolCallId },
         content: [{ type: 'tool-result', toolCallId: callId, content: [] }],
       },
       ...(error === undefined ? {} : { error }),
@@ -36,11 +37,11 @@ function toolResult(seq: number, callId: string, turn: number, step: number, err
 }
 
 function turnStart(seq: number, turn: number): SessionEvent {
-  return { seq, time: 1000 + seq, type: 'turn/start', data: { turn } }
+  return { seq: SessionSeq(seq), time: 1000 + seq, type: 'turn/start', data: { turn } }
 }
 
 function turnEnd(seq: number, turn: number): SessionEvent {
-  return { seq, time: 1000 + seq, type: 'turn/end', data: { turn, reason: { kind: 'completed' } } }
+  return { seq: SessionSeq(seq), time: 1000 + seq, type: 'turn/end', data: { turn, reason: { kind: 'completed' } } }
 }
 
 describe('emptySummaryState', () => {
@@ -130,7 +131,7 @@ describe('applySummaryEvent', () => {
   it('passes non-turn events through untouched', () => {
     const state = emptySummaryState(sid)
     const unchanged = applySummaryEvent(state, {
-      seq: 1,
+      seq: SessionSeq(1),
       time: 1001,
       type: 'user/message',
       data: { content: [{ type: 'text', text: 'hi' }] },

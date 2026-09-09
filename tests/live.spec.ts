@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { AgentStatus } from '@deepseek-ai/dsh-agent'
 import { applyLiveEvent, emptyLiveState, trackAgent } from '../src/adapter/live.js'
 
@@ -8,23 +9,23 @@ const sid = 'test-live-1' as SessionId
 
 function toolCall(seq: number, callId: string, name: string, argsRaw: string, turn: number, step: number): SessionEvent {
   return {
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/call',
-    data: { callId: callId as CallId, name, arguments: argsRaw, turn, step },
+    data: { callId: callId as ToolCallId, name, arguments: argsRaw, turn, step },
   }
 }
 
 function toolResult(seq: number, callId: string, turn: number, step: number): SessionEvent {
   return {
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/result',
     data: {
       turn,
       step,
       message: {
-        source: { kind: 'tool', callId: callId as CallId },
+        source: { kind: 'tool', callId: callId as ToolCallId },
         content: [{ type: 'tool-result', toolCallId: callId, content: [] }],
       },
     },
@@ -47,7 +48,7 @@ describe('applyLiveEvent activity projection', () => {
       type: 'tool-call',
       turn: 1,
       step: 0,
-      callId: 'c1' as CallId,
+      callId: 'c1' as ToolCallId,
       name: 'read_file',
       arguments: '{"file_path":"src/a.ts"}',
     })
@@ -62,22 +63,22 @@ describe('applyLiveEvent activity projection', () => {
 
   it('clears activity when its call result arrives', () => {
     let state = emptyLiveState(sid)
-    state = applyLiveEvent(state, { type: 'tool-call', turn: 1, step: 0, callId: 'c1' as CallId, name: 'bash', arguments: '{}' })
-    state = applyLiveEvent(state, { type: 'tool-result', callId: 'c1' as CallId })
+    state = applyLiveEvent(state, { type: 'tool-call', turn: 1, step: 0, callId: 'c1' as ToolCallId, name: 'bash', arguments: '{}' })
+    state = applyLiveEvent(state, { type: 'tool-result', callId: 'c1' as ToolCallId })
     expect(state.activity).toBeUndefined()
   })
 
   it('keeps activity when an unrelated call result arrives', () => {
     let state = emptyLiveState(sid)
-    state = applyLiveEvent(state, { type: 'tool-call', turn: 1, step: 0, callId: 'c1' as CallId, name: 'bash', arguments: '{}' })
-    state = applyLiveEvent(state, { type: 'tool-result', callId: 'ghost' as CallId })
+    state = applyLiveEvent(state, { type: 'tool-call', turn: 1, step: 0, callId: 'c1' as ToolCallId, name: 'bash', arguments: '{}' })
+    state = applyLiveEvent(state, { type: 'tool-result', callId: 'ghost' as ToolCallId })
     expect(state.activity?.callId).toBe('c1')
   })
 
   it('does not disturb status/inbox when folding activity', () => {
     let state = emptyLiveState(sid)
     state = applyLiveEvent(state, { type: 'status', status: 'running' })
-    state = applyLiveEvent(state, { type: 'tool-call', turn: 2, step: 1, callId: 'c1' as CallId, name: 'run_tests', arguments: '{}' })
+    state = applyLiveEvent(state, { type: 'tool-call', turn: 2, step: 1, callId: 'c1' as ToolCallId, name: 'run_tests', arguments: '{}' })
     expect(state.status).toBe('running')
     expect(state.activity?.name).toBe('run_tests')
   })

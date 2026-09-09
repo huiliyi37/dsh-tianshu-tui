@@ -4,12 +4,12 @@
  * 与 format/turn-summary.ts（渲染层）区分：本文件是事件折叠模型，
  * 输入 SessionEvent（tool/call + tool/result），输出轮级统计。
  */
-import type { CallId } from '@deepseek-ai/dsh-llm';
+import type { ToolCallId } from '@deepseek-ai/dsh-llm';
 import type { SessionEvent } from '@deepseek-ai/dsh-session';
 import { type ToolFamily } from './format/tool-family.js';
 /** 单次工具调用记录（tool/call 建档，tool/result 配对补齐耗时与失败位）。 */
 export interface ToolCallRecord {
-    callId: CallId;
+    callId: ToolCallId;
     name: string;
     family: ToolFamily;
     startedAt: number;

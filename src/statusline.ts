@@ -25,6 +25,19 @@
 
 import { spawn } from 'node:child_process'
 
+// rc.1 起 'todo/write' 的类型声明随官方 dsh-tool-todo 外移出核心 SessionEventMap；
+// TUI 只做 switch 相位收窄，不消费 payload——本地合并同款官方结构（TodoItem：
+// content + 三态 status）保住事件判别。
+declare module '@deepseek-ai/dsh-session' {
+  interface TodoItem {
+    content: string
+    status: 'pending' | 'in_progress' | 'completed'
+  }
+  interface SessionEventMap {
+    'todo/write': { todos: TodoItem[] }
+  }
+}
+
 /** 写入脚本 stdin 的协议 payload（CC 字段子集 + rivet 扩展；见模块头示例）。 */
 export interface StatusLinePayload {
   session_id: string

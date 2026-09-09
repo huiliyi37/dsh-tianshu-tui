@@ -21,11 +21,7 @@
  */
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import {
-  collectSessionTitleMessages,
-  fallbackSessionTitle,
-  foldSessionTitle,
-} from '@deepseek-ai/dsh-session-title'
+import { fallbackSessionTitle, foldSessionTitle } from '@deepseek-ai/dsh-session-title'
 
 /** 无任何真人聊天记录的会话直接展示的占位标题（状态而非内容）。 */
 export const EMPTY_TITLE = '新对话'
@@ -48,10 +44,28 @@ export const FALLBACK_MAX_BYTES = 40
 function titleFromEvents(events: readonly SessionEvent[]): string | undefined {
   const folded = foldSessionTitle(events)
   if (folded !== undefined) return folded.title
-  /* v8 ignore next -- collectSessionTitleMessages 恒返回数组，[0] 可能 undefined；noUncheckedIndexedAccess 收窄防御 */
-  const first = collectSessionTitleMessages(events)[0]
+  /* v8 ignore next -- firstUserMessageText 恒返回 string | undefined */
+  const first = firstUserMessageText(events)
   if (first === undefined) return undefined
-  return fallbackSessionTitle(first.text, FALLBACK_MAX_WORDS, FALLBACK_MAX_BYTES)
+  return fallbackSessionTitle(first, FALLBACK_MAX_WORDS, FALLBACK_MAX_BYTES)
+}
+
+/**
+ * 首条真人消息文本（collectSessionTitleMessages 的本地同语义折叠：rc.1 起
+ * dsh-session-title 不再公开该导出）。过滤 user/message 且 source.kind==='user'，
+ * 文本块按行拼接，全空白跳过。
+ */
+function firstUserMessageText(events: readonly SessionEvent[]): string | undefined {
+  for (const event of events) {
+    if (event.type !== 'user/message' || event.data.source.kind !== 'user') continue
+    const text = event.data.content
+      .filter((block) => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n')
+    if (text.trim().length === 0) continue
+    return text
+  }
+  return undefined
 }
 
 /**

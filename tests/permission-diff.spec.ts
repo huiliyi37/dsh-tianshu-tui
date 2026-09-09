@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import {
   commandPrefixForRequest,
   commandPrefixOf,
@@ -303,7 +303,7 @@ describe('bash 命令数据通路（决策分层阶段 2）', () => {
     return {
       ...view,
       tools: [{
-        callId: callId as CallId, name, arguments: argsJson,
+        callId: callId as ToolCallId, name, arguments: argsJson,
         turn: 1, step: 0, seq: 1, time: 0, result: undefined, error: undefined,
       }],
     }
@@ -312,7 +312,7 @@ describe('bash 命令数据通路（决策分层阶段 2）', () => {
   const reqWithCall = (callId?: string) => ({
     agent: { session: { id: 's1' as SessionId } },
     toolName: 'bash',
-    ...(callId === undefined ? {} : { callId: callId as CallId }),
+    ...(callId === undefined ? {} : { callId: callId as ToolCallId }),
   })
 
   it('commandPrefixForRequest：callId → transcript → command 首 token', () => {
@@ -337,8 +337,8 @@ describe('bash 命令数据通路（决策分层阶段 2）', () => {
     const withTwo: TranscriptView = {
       ...view,
       tools: [
-        { ...base, callId: 'c1' as CallId, name: 'bash', arguments: args({ command: 'ls' }), seq: 1 },
-        { ...base, callId: 'c1' as CallId, name: 'bash', arguments: args({ command: 'pwd' }), seq: 2 },
+        { ...base, callId: 'c1' as ToolCallId, name: 'bash', arguments: args({ command: 'ls' }), seq: 1 },
+        { ...base, callId: 'c1' as ToolCallId, name: 'bash', arguments: args({ command: 'pwd' }), seq: 2 },
       ],
     }
     expect(findApprovalToolCall(reqWithCall('c1'), withTwo)?.arguments).toBe(args({ command: 'pwd' }))

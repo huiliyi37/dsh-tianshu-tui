@@ -12,6 +12,12 @@
       config:
         default: standard
 
+    # rc.1 起 standard preset 的 tool-subagent 行开 modelSelectionSettings: true，
+    # 要求 Host scope 有 model-selection-settings 服务（官方 web-app 有、dsh-base
+    # 无）——不挂则 standard 挂载整体失败，会话无工具面。shipped 组成默认关。
+    - id: subagent-model-selection-settings
+      name: '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
+
     # LSP 模型工具面（任务6对齐，2026-08-27）：tianshu-public 0.6.0 三件套——
     # seam（ctx.lsp 注册表）+ stdio 本地 provider + 模型工具（单 lsp 工具四操作：
     # goToDefinition / findReferences / goToImplementation / hover）。lsp-local

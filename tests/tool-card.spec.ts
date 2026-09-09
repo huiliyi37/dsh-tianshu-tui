@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { RivetTheme } from '../src/theme.js'
 import { resetTermCapsCache } from '../src/term-caps.js'
 import {
@@ -277,9 +277,9 @@ describe('formatToolCardLive', () => {
 describe('formatToolGroup', () => {
   function makeState(): { state: ToolGroupState; group: ToolGroup } {
     let s = emptyToolGroups()
-    s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c1' as CallId, turn: 1, step: 2, name: 'read_file', arguments: '{"file_path":"a.ts"}' })
-    s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c2' as CallId, turn: 1, step: 2, name: 'grep', arguments: '{"pattern":"TODO"}' })
-    s = applyToolGroupEvent(s, { type: 'tool-result', callId: 'c1' as CallId, content: 'ok', isError: false })
+    s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c1' as ToolCallId, turn: 1, step: 2, name: 'read_file', arguments: '{"file_path":"a.ts"}' })
+    s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c2' as ToolCallId, turn: 1, step: 2, name: 'grep', arguments: '{"pattern":"TODO"}' })
+    s = applyToolGroupEvent(s, { type: 'tool-result', callId: 'c1' as ToolCallId, content: 'ok', isError: false })
     const group = s.groups.get('1:2')!
     return { state: s, group }
   }
@@ -308,7 +308,7 @@ describe('formatToolGroup', () => {
 
   it('arguments 非法 JSON：容错为 undefined，标题无参数摘要', () => {
     let s = emptyToolGroups()
-    s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c1' as CallId, turn: 1, step: 2, name: 'bash', arguments: '{broken' })
+    s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c1' as ToolCallId, turn: 1, step: 2, name: 'bash', arguments: '{broken' })
     const group = s.groups.get('1:2')!
     const rows = plain(formatToolGroup({ group, expanded: true, theme: fakeTheme() }))
     expect(rows.join('\n')).toContain('Run')
@@ -317,7 +317,7 @@ describe('formatToolGroup', () => {
   it('arguments 空串/非对象 JSON：容错 undefined，仍渲染标题', () => {
     for (const raw of ['', '[1,2]', '"str"']) {
       let s = emptyToolGroups()
-      s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c1' as CallId, turn: 1, step: 2, name: 'bash', arguments: raw })
+      s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c1' as ToolCallId, turn: 1, step: 2, name: 'bash', arguments: raw })
       const group = s.groups.get('1:2')!
       const rows = plain(formatToolGroup({ group, expanded: true, theme: fakeTheme() }))
       expect(rows.join('\n')).toContain('Run')

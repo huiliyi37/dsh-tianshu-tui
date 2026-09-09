@@ -3,9 +3,26 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
-## [Unreleased]
+## [0.1.2-rc.29] - 2026-09-09
 
-欢迎页三模式：blue「蓝鲸抱星 + 艺术字大标题」默认登场，star「紫鲸举星 + 艺术字标题」与 retro 复古小鲸鱼可切换。
+欢迎页三模式 + 宿主线 0.1.2-rc.1 适配。
+
+### 宿主线 0.1.2-rc.1 适配（官方 2026-09-03 发布，`next` 标签）
+
+- **依赖钉线整体切换** — 52 个 `@deepseek-ai/dsh-*` peer/dev 依赖 `^0.1.1-rc.2 → ^0.1.2-rc.1`（`dsh-agent-presets` 精确钉同步；spine demo 夹具钉 alpha.2——rc 线无发布）；cordis `^4.0.2` / include `^1.0.7` / loader `^1.0.3` / timer `^1.1.4` / schemastery `^3.18.2`；新增 `dsh-util-values`（JsonValue 新家）
+- **Session.events getter 移除适配** — 约 10 处调用点（导出/摘要/transcript 重放/fork seed/btw seed/wire 工具名等）改走 `snapshotEvents()`；fork 血缘参数从 `meta.seedLength` 改为 `meta.isSeeded` + 顶层 `inheritedEventCount`（`/fork`、`/branch`、`/btw` 三路径）
+- **userQuestions waterfall wire** — `registerProvider` 已被官方移除，改挂 `ctx.on('user-questions/request')` answerer 并以 `{ global: true }` 注册（事件为 scope-filtered，TUI 插件 fiber 不在任何 agent 作用域链上，global 是唯一全局收口；重叠请求沿用 ASK_CANCELLED）
+- **CallId → ToolCallId** — dsh-llm 根导出改名，22 文件类型跟随
+- **preset 目录 PTC 更名** — 官方 id `code → ptc`（`/preset code` 经别名折到 `ptc`），别名表翻转
+- **todo/write 本地类型合并** — 事件类型声明随官方 dsh-tool-todo 外移出核心 SessionEventMap，statusline 工作流相位本地合并同款结构
+- **宿主线守卫（fail-loud）** — attach 探测 `Session.prototype.snapshotEvents`：旧宿主（≤0.1.1-rc.2）启动即报错并给出升级官方 CLI / 回退插件的可行动指引，绝不在会话路径深处炸 TypeError
+- **组合测试线适配** — 三个 real-spine 组合显式装配 `agent-loop` 插件（factory 注册不再由 spine demo 代办）；`tests/spine-events-compat.ts` 给停在 alpha.2 的 spine demo 桥一层 `Session.events → snapshotEvents()` 垫片（官方发 rc 线 spine 后移除）；组合测试提问场景补 `request.agent` 载体
+- **bundle patch 补 subagent-model-selection-settings** — rc.1 起 standard preset 的 tool-subagent 行开 `modelSelectionSettings: true`，要求 Host scope 有该服务（官方 web-app 有、dsh-base 无），不挂则 standard 挂载整体失败、会话无工具面（shipped 组成默认关）
+- **真机验证** — vendor/dev 宿主重建到 0.1.2-rc.1（`node_modules.rc2-bak` 可回滚），pty e2e 全绿：启动、会话持久化、/session list/选择器、同目录重启复用、空会话 artifact 清理
+
+### 欢迎页三模式
+
+blue「蓝鲸抱星 + 艺术字大标题」默认登场，star「紫鲸举星 + 艺术字标题」与 retro 复古小鲸鱼可切换。
 
 - **blue 新版欢迎页（默认）** — 左：品牌像素画（蓝鲸抱星，水面倒影/气泡/腮红粉构图，44×34 索引像素自 9-02 品牌原图经生成管线产出（44 列 = omts 同款上限：块字符在 ambiguous 宽渲染终端占 2 列，88 列内不折行）——边缘洪泛抠图 + 逐格统计采样（覆盖率掩码保细线条 + 格内中位色抗噪），`scripts/generate-welcome-blue.mjs` → `format/whale-blue-frames.ts`，median-cut 9 主色 + 锚定 6 关键色（星核/星金/腮红粉/白肚/身体主蓝/高光蓝）15 色板；精细化后处理（8 邻填洞修采样裂缝、最深色中段簇定位眼睛补高光点）；half-block 实色双拼渲染（渐变图不用盲文点阵——混色格亮点归前景点/暗点归背景即成麻点，omts 渲染默认 half 档同理），背景透明、品牌固定色）；右：figlet ANSI Shadow 艺术字标题块（`DeepSeek` + `< Harness >` 纯文本副标，ANSI Shadow 64 / Standard 44 / Mini 33 三档随右栏宽度伸缩，`scripts/generate-welcome-title.mjs` 生成期固化）+ `@tianshu` 贡献者标识行（附版本号）+ 环境行 + Tips。鲸鱼以品牌块为锚垂直对齐
 - **star 紫鲸欢迎页（可切换）** — 同一 hero 布局（`format/welcome.ts` 共享像素画 hero 核）：紫罗兰鲸鱼托举光晕金星（8-22 品牌原图字幕带已切除，`scripts/generate-welcome-star.mjs` → `format/whale-star-frames.ts` 同款管线）+ figlet Standard/Mini 艺术字标题块（`DeepSeek»` + `< Harness >`）

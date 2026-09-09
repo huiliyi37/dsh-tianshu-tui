@@ -11,7 +11,7 @@
  */
 import type { ToolCallView, ToolResult, ToolResultView } from '@deepseek-ai/dsh-tools';
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
-import type { JsonValue } from '@deepseek-ai/dsh-session';
+import type { JsonValue } from '@deepseek-ai/dsh-util-values';
 /**
  * tools 服务的最小消费面（presenter 槽位可选，与 ToolDefinition 契约对齐）。
  * TUI 经 `ctx.get('tools')` 动态获取——tools 是可选服务，缺失即整体降级。

@@ -45,6 +45,7 @@ export async function createForkedAgent(
     sessionId: childId,
     seed: spec.seed,
     meta: spec.meta,
+    inheritedEventCount: spec.inheritedEventCount,
     agentOptions: { provider: selection.provider, model: selection.model },
     setup: async (agentCtx) => {
       installModelSelection(agentCtx, ref)

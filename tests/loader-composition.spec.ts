@@ -19,8 +19,13 @@ import UserApproval from '@deepseek-ai/dsh-user-approval'
 import UserQuestions from '@deepseek-ai/dsh-user-questions'
 import * as LlmReplay from '@deepseek-ai/dsh-llm-replay'
 import * as AgentSpine from '@deepseek-ai/dsh-agent-spine-demo'
+import { installSpineEventsCompat } from './spine-events-compat.js'
+
+// spine-demo 停在 alpha.2：安装 Session.events → snapshotEvents 兼容垫片（见模块头）
+installSpineEventsCompat()
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
 import Subagent, { SubagentRunId } from '@deepseek-ai/dsh-subagent'
+    import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { WorkflowRunId } from '@deepseek-ai/dsh-workflow'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -148,6 +153,8 @@ async function boot(opts?: { withGoalSubagent?: boolean }): Promise<Booted> {
       '- id: subagent',
       "  name: '@deepseek-ai/dsh-subagent'",
     ] : []),
+    '- id: agent-loop',
+      "  name: '@deepseek-ai/dsh-agent-loop'",
     '- id: agent-spine',
     "  name: '@deepseek-ai/dsh-agent-spine-demo'",
     '  config:',
@@ -183,6 +190,7 @@ async function boot(opts?: { withGoalSubagent?: boolean }): Promise<Booted> {
     ['@deepseek-ai/dsh-llm-replay', LlmReplay],
     ['@deepseek-ai/dsh-agent-default-model', AgentDefaultModel],
     ['@deepseek-ai/dsh-subagent', Subagent],
+    ['@deepseek-ai/dsh-agent-loop', AgentLoop],
     ['@deepseek-ai/dsh-agent-spine-demo', AgentSpine],
     ['@huiliyi37/dsh-tianshu-tui', wrappedTui],
   ])
@@ -319,8 +327,11 @@ describe('tui real Loader composition through cordis.yml', () => {
     // 到 TUI answerer（真实 ApprovalService.request 要求开着的回合，组合线会话
     // 空闲——绕过服务策略层，直测 TUI 的挂起/结算行为）。scope 不变量要求载体
     // 键与事件主体同对象（dsh-scope 强制）：载体键到 req.agent。
+    // rc.1 wire：ask 必须携带 live agent（scope-filtered 派发的载体），answerer
+    // 由 TUI global 注册接收。
     const question = ctx.userQuestions.ask({
       questions: [{ id: 'q1', question: '继续？', options: [{ label: '是' }, { label: '否' }] }],
+      agent,
     })
     // 立即挂接断言（reject 发生在切会话/dispose 时）——晚挂接会留未处理
     // rejection 窗口（afterEach 的 fiber dispose 也会 cancel 挂起提问）。

@@ -11,7 +11,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { AgentStatus } from '@deepseek-ai/dsh-agent';
-import type { CallId } from '@deepseek-ai/dsh-llm';
+import type { ToolCallId } from '@deepseek-ai/dsh-llm';
 import type { SessionId, UserMessage } from '@deepseek-ai/dsh-session';
 /** One surfaced agent error with its in-turn position. */
 export interface LiveError {
@@ -21,7 +21,7 @@ export interface LiveError {
 }
 /** The tool call currently executing, projected from `tool/call` until its `tool/result`. */
 export interface LiveActivity {
-    readonly callId: CallId;
+    readonly callId: ToolCallId;
     /** Tool name as the model produced it. */
     readonly name: string;
     /** Raw arguments JSON string, exactly as the model produced it (unparsed). */
@@ -73,12 +73,12 @@ export declare function applyLiveEvent(state: LiveAgentState, event: {
     type: 'tool-call';
     turn: number;
     step: number;
-    callId: CallId;
+    callId: ToolCallId;
     name: string;
     arguments: string;
 } | {
     type: 'tool-result';
-    callId: CallId;
+    callId: ToolCallId;
 } | {
     type: 'error';
     turn: number;

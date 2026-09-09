@@ -29,7 +29,7 @@
  */
 
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 
 /** 审批 answerer 的本地请求形状（与 user-approval 词汇对齐；字段子集——TUI 只需展示所需）。 */
 export interface PendingApprovalRequest {
@@ -37,7 +37,7 @@ export interface PendingApprovalRequest {
   toolName: string
   reason?: string
   /** C2 项 1：关联的精确工具调用（user-approval 运行时携带，用于审批 diff 查找）。 */
-  callId?: CallId
+  callId?: ToolCallId
   /**
    * 请求撤销信号（user-approval `ApprovalRequest.signal` 透传）：abort 时挂起
    * 自动结算为 cancelled——asker 侧已把 abort 竞速为 cancelled，卡片必须同步

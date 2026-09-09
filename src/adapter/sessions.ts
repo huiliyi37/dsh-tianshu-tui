@@ -16,6 +16,7 @@ import { rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Session, SessionEvent, SessionForkSource, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import { resolvePresetId } from '../preset-surface.js'
 import { EMPTY_TITLE, sessionTitleFor } from './session-title.js'
 
@@ -100,7 +101,7 @@ export async function listSessions(ctx: Context): Promise<SessionSummary[]> {
       // 比 header 创建值更新；持久化会话不 inspect（避免 N 次 IO），回落 header 值。
       const live = ctx.sessions.get(header.id)
       if (live !== undefined) {
-        const preset = resolvePresetId(summary.agentPreset, live.events)
+        const preset = resolvePresetId(summary.agentPreset, live.snapshotEvents())
         if (preset !== undefined) return { ...summary, agentPreset: preset }
       }
       return summary
@@ -155,16 +156,18 @@ export function forkAgentSpec(
   parentSessionId: SessionId = parent.id,
 ): {
   seed: readonly SessionEvent[]
-  meta: { cwd: string; parentSession: SessionId; seedLength: number }
+  meta: { cwd: string; parentSession: SessionId; isSeeded: boolean }
+  inheritedEventCount: SessionLogOffset
 } {
-  const seed = liveForkSeed(parent.events)
+  const seed = liveForkSeed(parent.snapshotEvents())
   return {
     seed,
     meta: {
       cwd: parent.header.cwd ?? fallbackCwd,
       parentSession: parentSessionId,
-      seedLength: seed.length,
+      isSeeded: seed.length > 0,
     },
+    inheritedEventCount: SessionLogOffset(seed.length),
   }
 }
 
@@ -174,9 +177,11 @@ export function forkSession(
   boundary?: number,
   childSessionId?: SessionId,
 ): Session {
-  if (boundary === undefined && childSessionId === undefined) return ctx.sessions.fork(source)
-  if (childSessionId === undefined) return ctx.sessions.fork(source, boundary)
-  return ctx.sessions.fork(source, boundary, childSessionId)
+  const at = boundary !== undefined ? SessionSeq(boundary) : undefined
+  if (childSessionId === undefined) {
+    return at === undefined ? ctx.sessions.fork(source) : ctx.sessions.fork(source, at)
+  }
+  return ctx.sessions.fork(source, at, childSessionId)
 }
 
 /**
@@ -190,7 +195,7 @@ export function forkSession(
  */
 export async function loadHistory(ctx: Context, id: SessionId): Promise<readonly SessionEvent[]> {
   const live = ctx.sessions.get(id)
-  if (live !== undefined) return live.events
+  if (live !== undefined) return live.snapshotEvents()
   const persistence = persistenceFacet(ctx)
   if (persistence !== undefined) {
     try {
@@ -238,7 +243,7 @@ export const REUSE_SCAN_LIMIT = 15
  */
 async function loadHistoryStrict(ctx: Context, id: SessionId): Promise<readonly SessionEvent[] | null> {
   const live = ctx.sessions.get(id)
-  if (live !== undefined) return live.events
+  if (live !== undefined) return live.snapshotEvents()
   const persistence = persistenceFacet(ctx)
   if (persistence === undefined || persistence.readFrom === undefined) return null
   try {

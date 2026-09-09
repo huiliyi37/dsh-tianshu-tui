@@ -22,6 +22,17 @@
  * - 超时 kill（默认 2s），脚本失败/超时保留上一次输出（不闪断）
  * - 输出截断到 300 字符、去掉换行——渲染层再按终端宽度 clamp
  */
+declare module '@deepseek-ai/dsh-session' {
+    interface TodoItem {
+        content: string;
+        status: 'pending' | 'in_progress' | 'completed';
+    }
+    interface SessionEventMap {
+        'todo/write': {
+            todos: TodoItem[];
+        };
+    }
+}
 /** 写入脚本 stdin 的协议 payload（CC 字段子集 + rivet 扩展；见模块头示例）。 */
 export interface StatusLinePayload {
     session_id: string;

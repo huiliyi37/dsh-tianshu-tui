@@ -10,7 +10,7 @@ import {
 describe('resolveShippedPresetId', () => {
   it('官方 id 原样；别名折到目录名', () => {
     expect(resolveShippedPresetId('standard')).toBe('standard')
-    expect(resolveShippedPresetId('ptc')).toBe('code')
+    expect(resolveShippedPresetId('code')).toBe('ptc')
     expect(resolveShippedPresetId('creative')).toBe('cordis')
     expect(resolveShippedPresetId('creator')).toBe('cordis')
     expect(resolveShippedPresetId('mine')).toBe('mine')
@@ -20,8 +20,8 @@ describe('resolveShippedPresetId', () => {
 describe('shippedPresetBlurb / presetShortLabel', () => {
   it('四套 shipped 都有短名与工具集', () => {
     expect(shippedPresetBlurb('standard')?.tools).toContain('bash')
-    expect(shippedPresetBlurb('code')?.short).toBe('PTC')
-    expect(shippedPresetBlurb('ptc')?.id).toBe('code')
+    expect(shippedPresetBlurb('ptc')?.short).toBe('PTC')
+    expect(shippedPresetBlurb('ptc')?.id).toBe('ptc')
     expect(presetShortLabel('minimal')).toBe('极简')
     expect(presetShortLabel('cordis')).toBe('创造')
     expect(presetShortLabel('custom-x')).toBe('custom-x')

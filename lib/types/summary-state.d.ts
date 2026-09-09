@@ -5,7 +5,7 @@
  * 折叠为会话级/轮级工具统计。turn 未结束不计入会话汇总。
  */
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session';
-import type { CallId } from '@deepseek-ai/dsh-llm';
+import type { ToolCallId } from '@deepseek-ai/dsh-llm';
 /** 按工具功能域（file/shell/search/edit/network/other）分桶的调用计数。 */
 export interface FamilyCounts {
     file: number;
@@ -36,7 +36,7 @@ export interface SummaryState {
         byFamily: FamilyCounts;
         startTime: number | undefined;
         elapsedMs: number;
-        callTimes: Map<CallId, number>;
+        callTimes: Map<ToolCallId, number>;
     };
     lastCompleted: {
         turn: number;

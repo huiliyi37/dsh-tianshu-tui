@@ -25,7 +25,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type { AgentHandle } from '@deepseek-ai/dsh-agent'
 import { controlsFromHandle } from '../adapter/send.js'
 import { joinPreset, presetJoinFacet } from '../adapter/preset-join.js'
@@ -126,7 +126,7 @@ export class BtwController {
     const session = this.ctx.sessions.get(activeId)
     if (session === undefined) throw new Error(`unknown session: ${activeId}`)
     const btwId = SessionId(`session-btw-${randomUUID()}`)
-    const seed = completedTurnSeed(session.events)
+    const seed = completedTurnSeed(session.snapshotEvents())
     const selection = this.ctx.agentDefaultModel.currentSelection()
     // 与 SessionStore.fork 同构：继承父会话 cwd（无则回退启动目录），并记下血缘。
     // 缺 cwd 的 btw 会话同样会掉进 `_no-cwd/`，Web 列表不可见（issue #5）。
@@ -137,8 +137,9 @@ export class BtwController {
       meta: {
         cwd: session.header.cwd ?? process.cwd(),
         parentSession: activeId,
-        seedLength: seed.length,
+        isSeeded: seed.length > 0,
       },
+      inheritedEventCount: SessionLogOffset(seed.length),
       agentOptions: { provider: selection.provider, model: selection.model },
       setup: async (agentCtx) => {
         await joinPreset({

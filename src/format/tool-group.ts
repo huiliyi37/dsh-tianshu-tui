@@ -23,7 +23,7 @@
  * 未知 callId 的 result 是 no-op（返回原状态引用）。
  */
 
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 
 /** 分组折叠的事件最小契约（投影输入；由调用方从 SessionEvent 提取）。
  *  - tool-call：必填 callId/turn/step/name/arguments（与 live.ts 提取一致）。
@@ -31,7 +31,7 @@ import type { CallId } from '@deepseek-ai/dsh-llm'
  *    也正确；content 为已折叠的结果文本（与 render.ts 提取逻辑同构）。 */
 export interface ToolGroupEvent {
   type: 'tool-call' | 'tool-result'
-  callId: CallId
+  callId: ToolCallId
   /** tool/call 所属 turn。 */
   turn?: number
   /** tool/call 所属 step（同 step 内并行调用聚合为一组）。 */
@@ -48,7 +48,7 @@ export interface ToolGroupEvent {
 
 /** 组内一条工具调用：call → result 的状态投影。 */
 export interface ToolGroupEntry {
-  readonly callId: CallId
+  readonly callId: ToolCallId
   /** 工具名（模型原样产出）。 */
   readonly name: string
   /** 原始参数 JSON 字符串。 */

@@ -41,7 +41,7 @@ function userMessage(seq: number): { seq: number; time: number; type: string; da
 }
 
 function header(id: string, createdAt: number, cwd?: string): SessionHeader {
-  return { id: SessionId(id), version: 0, createdAt, ...(cwd === undefined ? {} : { cwd }) }
+  return { id: SessionId(id), version: 0, createdAt, isSeeded: false, ...(cwd === undefined ? {} : { cwd }) }
 }
 
 interface FakePersistence {

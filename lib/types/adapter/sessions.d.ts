@@ -13,6 +13,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Session, SessionEvent, SessionForkSource, SessionId } from '@deepseek-ai/dsh-session';
+import { SessionLogOffset } from '@deepseek-ai/dsh-session';
 /** One session row for the TUI session list. */
 export interface SessionSummary {
     /** Session identity (shared with its agent, when live). */
@@ -74,8 +75,9 @@ export declare function forkAgentSpec(parent: Session, fallbackCwd: string, pare
     meta: {
         cwd: string;
         parentSession: SessionId;
-        seedLength: number;
+        isSeeded: boolean;
     };
+    inheritedEventCount: SessionLogOffset;
 };
 export declare function forkSession(ctx: Context, source: SessionForkSource, boundary?: number, childSessionId?: SessionId): Session;
 /**

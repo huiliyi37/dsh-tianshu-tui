@@ -13,7 +13,7 @@
  * @module @deepseek-ai/dsh-tianshu-tui/adapter/transcript
  */
 import type { Context } from '@deepseek-ai/cordis';
-import type { CallId } from '@deepseek-ai/dsh-llm';
+import type { ToolCallId } from '@deepseek-ai/dsh-llm';
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session';
 /** One completed message row on the TUI surface. */
 export interface TranscriptMessage {
@@ -37,7 +37,7 @@ export interface TranscriptMessage {
 /** One tool invocation on the TUI surface, paired call → result. */
 export interface TranscriptToolCall {
     /** Stable call identity shared by `tool/call` and `tool/result`. */
-    readonly callId: CallId;
+    readonly callId: ToolCallId;
     /** Tool name exactly as the model requested it. */
     readonly name: string;
     /** Raw arguments JSON exactly as the model produced it. */

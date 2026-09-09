@@ -52,7 +52,8 @@ function makeCtx(overrides: {
     sessions: {
       get: vi.fn(() => ({
         events: overrides.events ?? [],
-        header: overrides.header ?? { id: ACTIVE, version: 0, createdAt: 1 },
+        snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
+        header: overrides.header ?? { id: ACTIVE, version: 0, createdAt: 1, isSeeded: false },
       })),
     },
     agentDefaultModel: {
@@ -172,7 +173,7 @@ describe('BtwController', () => {
     controller.dispose()
   })
 
-  it('ask 把父会话 cwd 与 parentSession/seedLength 写入 create meta', async () => {
+  it('ask 把父会话 cwd 与 parentSession/isSeeded+inheritedEventCount 写入 create', async () => {
     const events = [
       event(0, 'user/message'),
       event(1, 'turn/start'),
@@ -186,13 +187,14 @@ describe('BtwController', () => {
     })
     await controller.ask('q')
     const createArgs = ctx.agents.create.mock.calls[0]?.[0] as
-      | { meta?: { cwd?: string; parentSession?: SessionId; seedLength?: number }; seed: readonly unknown[] }
+      | { meta?: { cwd?: string; parentSession?: SessionId; isSeeded?: boolean }; inheritedEventCount?: number; seed: readonly unknown[] }
       | undefined
     expect(createArgs?.meta).toEqual({
       cwd: '/workspace',
       parentSession: ACTIVE,
-      seedLength: 3,
+      isSeeded: true,
     })
+    expect(createArgs?.inheritedEventCount).toBe(3)
     controller.dispose()
   })
 
@@ -205,13 +207,14 @@ describe('BtwController', () => {
     })
     await controller.ask('q')
     const createArgs = ctx.agents.create.mock.calls[0]?.[0] as
-      | { meta?: { cwd?: string; parentSession?: SessionId; seedLength?: number } }
+      | { meta?: { cwd?: string; parentSession?: SessionId; isSeeded?: boolean }; inheritedEventCount?: number }
       | undefined
     expect(createArgs?.meta).toEqual({
       cwd: process.cwd(),
       parentSession: ACTIVE,
-      seedLength: 0,
+      isSeeded: false,
     })
+    expect(createArgs?.inheritedEventCount).toBe(0)
     controller.dispose()
   })
 

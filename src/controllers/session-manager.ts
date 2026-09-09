@@ -68,7 +68,7 @@ export class SessionManager {
       snapshots.push({
         id: session.id,
         status: this.ctx.agents.get(session.id)?.status ?? 'idle',
-        messageCount: session.events.length,
+        messageCount: session.snapshotEvents().length,
       })
     }
     return snapshots

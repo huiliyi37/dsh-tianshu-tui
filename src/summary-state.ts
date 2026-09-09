@@ -5,7 +5,7 @@
  * 折叠为会话级/轮级工具统计。turn 未结束不计入会话汇总。
  */
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 // 家族映射唯一来源：format/tool-family（着色与统计共用同一「工具名 → 功能域」，
 // 投影不重复造轮子——projection-layer.md 契约）。
 import { getToolColorFamily, type ToolFamily } from './format/tool-family.js'
@@ -42,7 +42,7 @@ export interface SummaryState {
     byFamily: FamilyCounts
     startTime: number | undefined
     elapsedMs: number
-    callTimes: Map<CallId, number>
+    callTimes: Map<ToolCallId, number>
   }
   lastCompleted: { turn: number; summary: TurnSummary } | undefined
   byFamily: FamilyCounts

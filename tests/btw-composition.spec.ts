@@ -34,8 +34,13 @@ import UserApproval from '@deepseek-ai/dsh-user-approval'
 import UserQuestions from '@deepseek-ai/dsh-user-questions'
 import * as LlmReplay from '@deepseek-ai/dsh-llm-replay'
 import * as AgentSpine from '@deepseek-ai/dsh-agent-spine-demo'
+import { installSpineEventsCompat } from './spine-events-compat.js'
+
+// spine-demo 停在 alpha.2：安装 Session.events → snapshotEvents 兼容垫片（见模块头）
+installSpineEventsCompat()
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
 import Subagent from '@deepseek-ai/dsh-subagent'
+  import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import * as Tui from '../src/index.js'
 
@@ -137,6 +142,8 @@ async function boot(): Promise<Booted> {
     '    model: deepseek-v4-flash',
     '- id: subagent',
     "  name: '@deepseek-ai/dsh-subagent'",
+    '- id: agent-loop',
+      "  name: '@deepseek-ai/dsh-agent-loop'",
     '- id: agent-spine',
     "  name: '@deepseek-ai/dsh-agent-spine-demo'",
     '  config:',
@@ -169,6 +176,7 @@ async function boot(): Promise<Booted> {
     ['@deepseek-ai/dsh-llm-replay', LlmReplay],
     ['@deepseek-ai/dsh-agent-default-model', AgentDefaultModel],
     ['@deepseek-ai/dsh-subagent', Subagent],
+  ['@deepseek-ai/dsh-agent-loop', AgentLoop],
     ['@deepseek-ai/dsh-agent-spine-demo', AgentSpine],
     ['@huiliyi37/dsh-tianshu-tui', wrappedTui],
   ])

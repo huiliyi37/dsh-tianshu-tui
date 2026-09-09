@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { RivetTheme } from '../src/theme.js'
 import {
   applyToolGroupEvent,
@@ -58,12 +58,12 @@ function plain(lines: readonly string[]): string[] {
 
 /** 构造一个 tool/call 事件。 */
 function call(callId: string, turn: number, step: number, name: string, args = '{}'): ToolGroupEvent {
-  return { type: 'tool-call', callId: callId as CallId, turn, step, name, arguments: args }
+  return { type: 'tool-call', callId: callId as ToolCallId, turn, step, name, arguments: args }
 }
 
 /** 构造一个 tool/result 事件（content 为折叠后的文本）。 */
 function result(callId: string, content = 'ok', isError = false): ToolGroupEvent {
-  return { type: 'tool-result', callId: callId as CallId, content, isError }
+  return { type: 'tool-result', callId: callId as ToolCallId, content, isError }
 }
 
 /** 按 (turn, step) 取组；不存在则测试失败。 */
@@ -118,7 +118,7 @@ describe('分组聚合（tool/call + tool/result 按 step 折叠）', () => {
 
   it('tool-call 缺 turn/step/name/arguments：兜底 UNKNOWN/-1 与默认值', () => {
     let s = emptyToolGroups()
-    s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c0' as CallId })
+    s = applyToolGroupEvent(s, { type: 'tool-call', callId: 'c0' as ToolCallId })
     const group = groupOf(s, -1, -1)
     expect(group.entries[0]).toMatchObject({ name: 'tool', arguments: '', turn: -1, step: -1 })
   })
@@ -126,7 +126,7 @@ describe('分组聚合（tool/call + tool/result 按 step 折叠）', () => {
   it('tool-result 缺 content/isError：兜底空串/false', () => {
     let s = emptyToolGroups()
     s = applyToolGroupEvent(s, call('c1', 1, 2, 'read_file'))
-    s = applyToolGroupEvent(s, { type: 'tool-result', callId: 'c1' as CallId })
+    s = applyToolGroupEvent(s, { type: 'tool-result', callId: 'c1' as ToolCallId })
     expect(groupOf(s, 1, 2).entries[0]).toMatchObject({ content: '', isError: false, completed: true })
   })
 

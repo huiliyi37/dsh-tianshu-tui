@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   emptyWorkflowView,
@@ -17,24 +18,24 @@ function ev(partial: SessionEvent): SessionEvent {
 }
 
 function turnStart(seq: number, turn: number): SessionEvent {
-  return ev({ seq, time: 1000 + seq, type: 'turn/start', data: { turn } })
+  return ev({ seq: SessionSeq(seq), time: 1000 + seq, type: 'turn/start', data: { turn } })
 }
 
 function turnEnd(seq: number, turn: number): SessionEvent {
-  return ev({ seq, time: 1000 + seq, type: 'turn/end', data: { turn, reason: { kind: 'completed' } } })
+  return ev({ seq: SessionSeq(seq), time: 1000 + seq, type: 'turn/end', data: { turn, reason: { kind: 'completed' } } })
 }
 
 function toolCall(seq: number, callId: string, name: string, raw: string, turn: number, step: number): SessionEvent {
   return ev({
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/call',
-    data: { callId: callId as CallId, name, arguments: raw, turn, step },
+    data: { callId: callId as ToolCallId, name, arguments: raw, turn, step },
   })
 }
 
 function todoWrite(seq: number): SessionEvent {
-  return ev({ seq, time: 1000 + seq, type: 'todo/write', data: { todos: [] } })
+  return ev({ seq: SessionSeq(seq), time: 1000 + seq, type: 'todo/write', data: { todos: [] } })
 }
 
 describe('inferPhaseFromTool', () => {
@@ -271,12 +272,12 @@ describe('WorkflowStatusLine (自包含事件订阅)', () => {
     const sessionHandler = handlers.get('session/event')?.[0]
     if (sessionHandler === undefined) throw new Error('session/event handler not registered')
 
-    sessionHandler({ id: sid }, ev({ seq: 1, time: 1000, type: 'approval/policy', data: { policy: 'never' } }))
+    sessionHandler({ id: sid }, ev({ seq: SessionSeq(1), time: 1000, type: 'approval/policy', data: { policy: 'never' } }))
     expect(updates[updates.length - 1]).toContain('[yolo]')
     expect(line.current).toContain('[yolo]')
 
     // preset 装配后优先显示预设名，policy 徽标让位
-    sessionHandler({ id: sid }, ev({ seq: 2, time: 1001, type: 'permission/preset', data: { preset: 'danger-full-access' } }))
+    sessionHandler({ id: sid }, ev({ seq: SessionSeq(2), time: 1001, type: 'permission/preset', data: { preset: 'danger-full-access' } }))
     expect(updates[updates.length - 1]).toContain('[danger-full-access]')
     expect(updates[updates.length - 1]).not.toContain('[yolo]')
     expect(line.current).toContain('[danger-full-access]')
@@ -289,7 +290,7 @@ describe('WorkflowStatusLine (自包含事件订阅)', () => {
     const sessionHandler = handlers.get('session/event')?.[0]
     if (sessionHandler === undefined) throw new Error('session/event handler not registered')
 
-    sessionHandler({ id: 'other-session' as SessionId }, ev({ seq: 1, time: 1000, type: 'approval/policy', data: { policy: 'never' } }))
+    sessionHandler({ id: 'other-session' as SessionId }, ev({ seq: SessionSeq(1), time: 1000, type: 'approval/policy', data: { policy: 'never' } }))
     expect(updates).toHaveLength(0)
     expect(line.current).toBeNull()
   })
@@ -352,7 +353,7 @@ describe('WorkflowStatusLine (自包含事件订阅)', () => {
     expect(line.current).not.toContain('收尾')
 
     // permission preset 徽标（安全可见性关键）在 idle 下保留
-    sessionHandler({ id: sid }, ev({ seq: 3, time: 1002, type: 'permission/preset', data: { preset: 'danger-full-access' } }))
+    sessionHandler({ id: sid }, ev({ seq: SessionSeq(3), time: 1002, type: 'permission/preset', data: { preset: 'danger-full-access' } }))
     expect(line.current).toContain('[danger-full-access]')
 
     // running 恢复后回到完整阶段文本（收尾 + 徽标）

@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { createMessage, createToolResultMessage, createUserMessage, CallId } from '@deepseek-ai/dsh-llm'
+import { createMessage, createToolResultMessage, createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { renderSessionExport } from '../src/format/export.ts'
 
@@ -30,7 +30,7 @@ function fixtureEvents(): SessionEvent[] {
           content: [
             { type: 'reasoning', text: '先看错误' },
             { type: 'text', text: '我来定位' },
-            { type: 'tool-call', id: CallId('c1'), name: 'read', arguments: '{"file":"a.ts"}' },
+            { type: 'tool-call', id: ToolCallId('c1'), name: 'read', arguments: '{"file":"a.ts"}' },
           ],
           source: { kind: 'plugin', plugin: 'test' },
         }),
@@ -44,7 +44,7 @@ function fixtureEvents(): SessionEvent[] {
         turn: 1,
         step: 1,
         message: createToolResultMessage({
-          callId: CallId('c1'),
+          callId: ToolCallId('c1'),
           content: [{ type: 'text', text: '文件内容 abc' }],
           isError: false,
         }),
@@ -89,7 +89,7 @@ describe('renderSessionExport', () => {
         turn: 1,
         step: 1,
         message: createToolResultMessage({
-          callId: CallId('c1'),
+          callId: ToolCallId('c1'),
           content: [{ type: 'text', text: long }],
           isError: false,
         }),

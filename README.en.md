@@ -32,7 +32,7 @@
 
 ## Install
 
-This package is not a standalone app. You need the official CLI [`@deepseek-ai/dsh`](https://www.npmjs.com/package/@deepseek-ai/dsh) (npm `latest`, currently `0.1.1-rc.2`; needs ≥ `0.1.0-rc.8`, aligned with the peer deps). `npm i` of this package alone will not run.
+This package is not a standalone app. You need the official CLI [`@deepseek-ai/dsh`](https://www.npmjs.com/package/@deepseek-ai/dsh) (npm `latest`, currently `0.1.2-rc.1`; needs ≥ `0.1.2-rc.1`, aligned with the peer deps). `npm i` of this package alone will not run.
 
 **One-click install (recommended)**: the repo ships cross-platform scripts that detect Node/pnpm, install the official CLI via pnpm, wire this plugin and launch (defaults to the npmmirror registry for CN networks):
 
@@ -81,7 +81,7 @@ If the official CLI is installed globally (`pnpm add -g @deepseek-ai/dsh`) and `
 
 ### 4. Agent presets (`/preset`)
 
-The command is `/preset` (there is no `/presets`). This bundle matches official web: it disables the host agent plane and mounts `@deepseek-ai/dsh-agent-presets` (pinned `0.1.1-rc.2`; npm `latest` still points at stale `0.0.1-rc.1`). Adding this plugin installs the roster; new sessions `mount` in `setup`. `/preset` switches the official shipped surface (standard / PTC / minimal / creative), rather than stacking on `dsh-base` tools.
+The command is `/preset` (there is no `/presets`). This bundle matches official web: it disables the host agent plane and mounts `@deepseek-ai/dsh-agent-presets` (pinned `0.1.2-rc.1`; npm `latest` still points at stale `0.0.1-rc.1`). Adding this plugin installs the roster; new sessions `mount` in `setup`. `/preset` switches the official shipped surface (standard / PTC / minimal / creative), rather than stacking on `dsh-base` tools.
 
 Usage:
 
@@ -123,7 +123,9 @@ The companion vision plugin lives in `vision-ask/` if you need image re-interrog
 
 ## Release notes
 
-Current npm `latest`: [`@huiliyi37/dsh-tianshu-tui@0.1.2-rc.28`](https://www.npmjs.com/package/@huiliyi37/dsh-tianshu-tui) ([GitHub Release](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v0.1.2-rc.28)).
+Current npm `latest`: [`@huiliyi37/dsh-tianshu-tui@0.1.2-rc.29`](https://www.npmjs.com/package/@huiliyi37/dsh-tianshu-tui) ([GitHub Release](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v0.1.2-rc.29)).
+
+**0.1.2-rc.29 (2026-09-09)**: host line moves to 0.1.2-rc.1 (now the official `latest`; fixes #56 boot crash) — `Session.events` removal adapted to `snapshotEvents()`, userQuestions migrated to a waterfall answerer (global registration), `CallId→ToolCallId`, preset `code→ptc`, fork lineage via `isSeeded`+`inheritedEventCount`, bundle patch gains `subagent-model-selection-settings`; older hosts (≤0.1.1-rc.2) fail loud at startup with upgrade/rollback guidance. ⚠ This release requires host ≥ 0.1.2-rc.1.
 
 **0.1.2-rc.28 (2026-08-29)**: vim improvements answering #55 — mode-distinct cursor (block in NORMAL / bar in insert), two-phase history search (queries may contain n/N; `Enter` to confirm then jump; the search target is now labelled), search-term highlight (also in `/scroll`); plus auto-refill of the input line on delivery failure and a README-keymap consistency guard.
 
@@ -133,7 +135,6 @@ Current npm `latest`: [`@huiliyi37/dsh-tianshu-tui@0.1.2-rc.28`](https://www.npm
 
 **0.1.2-rc.25 (2026-08-28)**: the P0 interaction trio — unified action registry for keybindings/commands/hints (app.ts ratchet 4359→4140), six-tier approval decisions (new `p` command-prefix whitelist and `f` reject-with-feedback, bash approvals now show the command preview with danger annotations), and mid-turn message queueing (`↑` recall, `Ctrl+Enter` cancel-and-send, abort keeps the queue); plus the `/scroll` pager, completion bell, vim insert remaps, and theme contrast checks.
 
-**0.1.2-rc.24 (2026-08-27)**: full vi/vim editing lands (#51, `/vim` toggle, Claude Code keymap parity) + bundled LSP trio dependency closure fixed (#54: boot-time `ERR_MODULE_NOT_FOUND` under pnpm).
 
 **0.1.2-rc.23 (2026-08-27)**: LSP trio aligned to the tianshu-public 0.6.0 official seam line (single `lsp` tool with four operations + local provider defaulting to tsserver), capability-gated diagnostic source prevents `/lsp` panel regression; host peers aligned to `^0.1.1-rc.2`.
 

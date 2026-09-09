@@ -19,8 +19,13 @@ import UserApproval from '@deepseek-ai/dsh-user-approval'
 import UserQuestions from '@deepseek-ai/dsh-user-questions'
 import * as LlmReplay from '@deepseek-ai/dsh-llm-replay'
 import * as AgentSpine from '@deepseek-ai/dsh-agent-spine-demo'
+import { installSpineEventsCompat } from './spine-events-compat.js'
+
+// spine-demo 停在 alpha.2：安装 Session.events → snapshotEvents 兼容垫片（见模块头）
+installSpineEventsCompat()
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
 import Subagent from '@deepseek-ai/dsh-subagent'
+  import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import * as Tui from '../src/index.js'
 import { joinPreset, presetJoinFacet } from '../src/adapter/preset-join.js'
@@ -118,6 +123,8 @@ describe('preset-join real spine composition', () => {
       '    model: deepseek-v4-flash',
       '- id: subagent',
       "  name: '@deepseek-ai/dsh-subagent'",
+      '- id: agent-loop',
+        "  name: '@deepseek-ai/dsh-agent-loop'",
       '- id: agent-spine',
       "  name: '@deepseek-ai/dsh-agent-spine-demo'",
       '  config:',
@@ -136,6 +143,7 @@ describe('preset-join real spine composition', () => {
       '  config:',
       '    default: standard',
       '    includeUserRoot: false',
+      '    includeShippedRoot: false',
       '    roots:',
       `      - path: ${JSON.stringify(presetRoot)}`,
       '        trust: system',
@@ -158,6 +166,7 @@ describe('preset-join real spine composition', () => {
       ['@deepseek-ai/dsh-llm-replay', LlmReplay],
       ['@deepseek-ai/dsh-agent-default-model', AgentDefaultModel],
       ['@deepseek-ai/dsh-subagent', Subagent],
+  ['@deepseek-ai/dsh-agent-loop', AgentLoop],
       ['@deepseek-ai/dsh-agent-spine-demo', AgentSpine],
       ['@deepseek-ai/dsh-agent-presets', AgentPresets],
       ['@huiliyi37/dsh-tianshu-tui', wrappedTui],

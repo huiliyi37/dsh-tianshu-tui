@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { applyTranscriptEvent, createTranscript, emptyTranscript } from '../src/adapter/transcript.js'
 
 const sid = 'test-session-1' as SessionId
@@ -11,7 +12,7 @@ function ev(partial: SessionEvent): SessionEvent {
 
 function userMessage(seq: number, text: string, _turn = 0): SessionEvent {
   return ev({
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'user/message',
     data: { content: [{ type: 'text', text }] },
@@ -20,7 +21,7 @@ function userMessage(seq: number, text: string, _turn = 0): SessionEvent {
 
 function chunk(seq: number, turn: number, step: number, text: string, kind: 'text-delta' | 'reasoning-delta' = 'text-delta'): SessionEvent {
   return ev({
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'assistant/chunk',
     data: { turn, step, chunk: { type: kind, text } },
@@ -29,7 +30,7 @@ function chunk(seq: number, turn: number, step: number, text: string, kind: 'tex
 
 function assistantMessage(seq: number, turn: number, step: number, text: string): SessionEvent {
   return ev({
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'assistant/message',
     data: { turn, step, message: { content: [{ type: 'text', text }] } },
@@ -38,16 +39,16 @@ function assistantMessage(seq: number, turn: number, step: number, text: string)
 
 function toolCall(seq: number, callId: string, name: string, raw: string, turn: number, step: number): SessionEvent {
   return ev({
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/call',
-    data: { callId: callId as CallId, name, arguments: raw, turn, step },
+    data: { callId: callId as ToolCallId, name, arguments: raw, turn, step },
   })
 }
 
 function toolResult(seq: number, callId: string, _content: string, error?: { name: string; code: string }): SessionEvent {
   return ev({
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/result',
     data: {
@@ -58,7 +59,7 @@ function toolResult(seq: number, callId: string, _content: string, error?: { nam
 }
 
 function turnStart(seq: number, turn: number): SessionEvent {
-  return ev({ seq, time: 1000 + seq, type: 'turn/start', data: { turn } })
+  return ev({ seq: SessionSeq(seq), time: 1000 + seq, type: 'turn/start', data: { turn } })
 }
 
 describe('emptyTranscript', () => {
@@ -108,7 +109,7 @@ describe('applyTranscriptEvent', () => {
   it('ignores non-delta chunks in the streaming text', () => {
     let view = emptyTranscript(sid)
     view = applyTranscriptEvent(view, ev({
-      seq: 1,
+      seq: SessionSeq(1),
       time: 1001,
       type: 'assistant/chunk',
       data: { turn: 1, step: 0, chunk: { type: 'block-start', index: 0, blockType: 'text' } },
@@ -119,7 +120,7 @@ describe('applyTranscriptEvent', () => {
   it('folds text and reasoning blocks into separate fields', () => {
     let view = emptyTranscript(sid)
     view = applyTranscriptEvent(view, ev({
-      seq: 1,
+      seq: SessionSeq(1),
       time: 1001,
       type: 'assistant/message',
       data: {
@@ -195,8 +196,8 @@ describe('applyTranscriptEvent', () => {
 
   it('advances only the seq watermark for boundary and bookkeeping events', () => {
     let view = emptyTranscript(sid)
-    view = applyTranscriptEvent(view, ev({ seq: 5, time: 1005, type: 'step/start', data: { turn: 1, step: 0 } }))
-    view = applyTranscriptEvent(view, ev({ seq: 6, time: 1006, type: 'todo/write', data: { todos: [] } }))
+    view = applyTranscriptEvent(view, ev({ seq: SessionSeq(5), time: 1005, type: 'step/start', data: { turn: 1, step: 0 } }))
+    view = applyTranscriptEvent(view, ev({ seq: SessionSeq(6), time: 1006, type: 'todo/write', data: { todos: [] } }))
     expect(view.seq).toBe(6)
     expect(view.messages).toHaveLength(0)
     expect(view.streaming).toBeUndefined()
@@ -244,7 +245,7 @@ describe('createTranscript', () => {
 
   it('replays the session log and folds live events for the same session', () => {
     const { ctx } = fakeCtx()
-    const session = { id: sid, events: [userMessage(1, 'replayed')] } as never
+    const session = { id: sid, events: [userMessage(1, 'replayed')], snapshotEvents: () => [userMessage(1, 'replayed')] } as never
     const t = createTranscript(ctx as never, session)
     expect(t.view.messages).toHaveLength(1)
     expect(t.view.messages[0]?.text).toBe('replayed')
@@ -258,7 +259,7 @@ describe('createTranscript', () => {
 
   it('ignores events published for other sessions', () => {
     const { ctx } = fakeCtx()
-    const session = { id: sid, events: [] } as never
+    const session = { id: sid, events: [], snapshotEvents: () => [] } as never
     const t = createTranscript(ctx as never, session)
     const handler = ctx.handlers.get('session/event')?.[0]
     if (handler === undefined) throw new Error('session/event handler not registered')
@@ -268,7 +269,7 @@ describe('createTranscript', () => {
 
   it('dispose detaches the session/event subscription', () => {
     const { ctx, dispose } = fakeCtx()
-    const session = { id: sid, events: [] } as never
+    const session = { id: sid, events: [], snapshotEvents: () => [] } as never
     const t = createTranscript(ctx as never, session)
     t.dispose()
     expect(dispose).toHaveBeenCalledTimes(1)

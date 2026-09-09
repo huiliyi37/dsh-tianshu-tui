@@ -3,7 +3,7 @@
  *
  * 花名册 list() 已有 preset.yml 的 name/description；本表补「工具集 + 能力」
  * 给 /preset 列表与 footer/顶栏短名。id 对齐 CLI
- * apps/cli/config/agent-presets/{standard,code,minimal,cordis}。
+ * apps/cli/config/agent-presets/{standard,ptc,minimal,cordis}（rc.1 起 code → ptc）。
  *
  * @module @huiliyi37/dsh-tianshu-tui/preset-catalog
  */
@@ -31,11 +31,11 @@ const BLURBS: readonly ShippedPresetBlurb[] = [
     tools: 'bash · 编辑 · 检索 · web · skills · 计划 · 目标 · 子代理 · 工作流',
   },
   {
-    id: 'code',
+    id: 'ptc',
     short: 'PTC',
     name: 'PTC 模式',
-    capability: '标准能力 + Code Mode：用一个 TypeScript 程序组合多步工具',
-    tools: '标准工具面 + run_code（Code Mode SDK）',
+    capability: '标准能力 + PTC：用一个 TypeScript 程序组合多步工具',
+    tools: '标准工具面 + run_code（PTC SDK）',
   },
   {
     id: 'minimal',
@@ -55,9 +55,9 @@ const BLURBS: readonly ShippedPresetBlurb[] = [
 
 const BY_ID = new Map(BLURBS.map(b => [b.id, b]))
 
-/** 用户口误 / 旧文档别名 → 官方目录 id。 */
+/** 用户口误 / 旧文档别名 → 官方目录 id（rc.1 起 Code Mode 正式更名 PTC mode）。 */
 const ALIASES: Readonly<Record<string, string>> = {
-  ptc: 'code',
+  code: 'ptc',
   creative: 'cordis',
   creator: 'cordis',
 }

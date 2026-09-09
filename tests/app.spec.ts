@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WriteStream } from 'node:tty'
-import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { Session, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import { TuiApp, parseSlashCommand } from '../src/ui/app.js'
 import { LiveEngine } from '../src/engine/live-engine.js'
@@ -166,7 +166,7 @@ function makeCtx(): Context & MockCtx {
 
 /** makeAgent 的 mock 字段类型：驱动方法可断言（mock/mockReturnValue）。 */
 interface MockAgent {
-  session: { requestHeader: ReturnType<typeof vi.fn> }
+  session: { requestHeader: ReturnType<typeof vi.fn>; mockLog: unknown[] }
   followup: ReturnType<typeof vi.fn>
   steer: ReturnType<typeof vi.fn>
   inject: ReturnType<typeof vi.fn>
@@ -176,13 +176,19 @@ interface MockAgent {
 
 /** 最小 live agent 替身：驱动方法可断言。 */
 function makeAgent(id: string): Agent & MockAgent {
+  const mockLog: unknown[] = []
   return {
     id: SessionId(id),
     options: {},
     session: {
       id: SessionId(id),
-      header: { id: SessionId(id), version: 0, createdAt: 1 },
-      events: [],
+      header: { id: SessionId(id), version: 0, createdAt: 1, isSeeded: false },
+      mockLog,
+      // rc.1 wire：Session.events getter 已移除，投影走 snapshotEvents()；
+      // 运行时保留 events 字段（与 mockLog 同一数组）——Object.assign 换日志的
+      // 用例（switchSession/fork）经 this.events 动态读取。
+      events: mockLog,
+      snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
       requestHeader: vi.fn(() => undefined),
       requestContext: vi.fn(() => undefined),
     },
@@ -285,6 +291,27 @@ afterEach(() => {
   createdLedgers.length = 0
   createdStdins.length = 0
   vi.restoreAllMocks()
+})
+
+describe('TuiApp 宿主线守卫（rc.1 wire）', () => {
+  it('旧宿主（无 Session.prototype.snapshotEvents）attach 即 fail-loud，附升级/回退指引', async () => {
+    const ctx = makeCtx()
+    const agent = makeAgent('guard-1')
+    ctx.agents.create.mockResolvedValue(makeHandle(agent))
+    ctx.sessions.get.mockReturnValue(agent.session)
+    const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
+    // 模拟旧宿主：rc.1 前的 Session 原型没有 snapshotEvents
+    const proto = Session.prototype as unknown as Record<string, unknown>
+    const saved = proto.snapshotEvents
+    Reflect.deleteProperty(proto, 'snapshotEvents')
+    try {
+      await expect(app.attach()).rejects.toThrow(/0\.1\.2-rc\.1\+ 官方宿主/)
+      await expect(app.attach()).rejects.toThrow(/@huiliyi37\/dsh-tianshu-tui@0\.1\.2-rc\.28/)
+    } finally {
+      proto.snapshotEvents = saved
+    }
+    await app.dispose()
+  })
 })
 
 describe('TuiApp agent-ensure 三分支', () => {
@@ -697,7 +724,7 @@ describe('TuiApp 启动复用（上一个空会话 id 复用 + cwd 重绑启动�
   it('/session 选择器展示会话摘要（标题 + 「新对话」空会话占位）', async () => {
     const ctx = makeCtx()
     const a = makeAgent('sum-a')
-    ;(a.session.events as unknown as { push(e: unknown): void }).push(userMessageEvent('评估某模型的识别准确率'))
+    ;(a.session.mockLog as unknown as { push(e: unknown): void }).push(userMessageEvent('评估某模型的识别准确率'))
     const b = makeAgent('sum-b')
     ctx.agents.create.mockResolvedValue(makeHandle(a))
     ctx.sessions.list.mockReturnValue([a.session, b.session])
@@ -1700,8 +1727,8 @@ describe('TuiApp Phase 8 审批 answerer', () => {
     ctx.agents.create.mockResolvedValue(handle)
     ctx.sessions.get.mockReturnValue(agent.session)
     // attach 前注入 tool/call 事件（transcript 在 mountSession 时 replay fold；
-    // Agent 接口声明 events 为 readonly，测试替身 cast 注入）
-    const events = agent.session.events as unknown as unknown[]
+    // 测试替身经 snapshotEvents 暴露同一底层数组，cast 注入）
+    const events = agent.session.mockLog
     events.push({
       type: 'tool/call',
       seq: 1,
@@ -1749,7 +1776,7 @@ describe('TuiApp Phase 8 审批 answerer', () => {
     const handle = makeHandle(agent)
     ctx.agents.create.mockResolvedValue(handle)
     ctx.sessions.get.mockReturnValue(agent.session)
-    const events = agent.session.events as unknown as unknown[]
+    const events = agent.session.mockLog
     events.push({
       type: 'tool/call',
       seq: 1,
@@ -1825,7 +1852,7 @@ describe('TuiApp Phase 8 审批 answerer', () => {
     ctx.sessions.get.mockReturnValue(agent.session)
     // attach 前注入 read_file tool/call（callId 命中 transcript.tools；read_file
     // 既无替换语义也非 bash 类 → formatPermissionDiff 返回 null，走 if (diff !== null) 的 null 侧）
-    const events = agent.session.events as unknown as unknown[]
+    const events = agent.session.mockLog
     events.push({
       type: 'tool/call',
       seq: 1,
@@ -1869,7 +1896,7 @@ describe('TuiApp Phase 8 审批 answerer', () => {
     ctx.sessions.get.mockReturnValue(agent.session)
     // attach 前注入 bash tool/call（场景 3：callId 命中但无 command 字段
     // → extractShellCommand null → formatPermissionDiff 返回 null）
-    const events = agent.session.events as unknown as unknown[]
+    const events = agent.session.mockLog
     events.push({
       type: 'tool/call',
       seq: 1,
@@ -2393,7 +2420,7 @@ describe('TuiApp Phase 6.1 slash 命令系统', () => {
     ctx.sessions.get.mockReturnValue(agent.session)
     // 塞一条用户消息事件（权威形状：data 即 UserMessage）。
     // Agent 接口声明 events 为 readonly，测试替身 cast 注入（同 approval-diff 用例）。
-    ;(agent.session.events as unknown as unknown[]).push({
+    ;(agent.session.mockLog).push({
       type: 'user/message',
       seq: 0,
       time: 1,
@@ -3886,8 +3913,9 @@ describe('TuiApp forkSession（A3 会话分叉）', () => {
       meta: expect.objectContaining({
         parentSession: parentId,
         cwd: process.cwd(),
-        seedLength: 0,
+        isSeeded: false,
       }),
+      inheritedEventCount: 0,
     }))
     expect(id).not.toBe(parentId)
     expect(String(id)).toMatch(/^session-/)
@@ -4628,43 +4656,27 @@ describe('TuiApp 事件回调驱动（resize / keymap / userInteraction）', () 
     await app.dispose()
   })
 
-  it('userQuestions 服务存在 → attach 时注册 ask provider', async () => {
+  it('userQuestions 服务存在 → attach 时注册 user-questions/request answerer', async () => {
     const ctx = makeCtx()
-    let provider: { ask: (request: unknown) => Promise<unknown> } | null = null
-    const registerProvider = vi.fn((p: { ask: (request: unknown) => Promise<unknown> }) => {
-      provider = p
-      return () => { }
-    })
-    ctx.reflect.get.mockImplementation((name: string) => {
-      if (name === 'userQuestions') return { registerProvider }
-      return undefined
-    })
     const agent = makeAgent('ui-1')
     ctx.agents.create.mockResolvedValue(makeHandle(agent))
     ctx.sessions.get.mockReturnValue(agent.session)
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
     await app.attach()
 
-    expect(registerProvider).toHaveBeenCalledTimes(1)
-    expect(provider).not.toBeNull()
+    // rc.1 wire：answerer 经 ctx.on('user-questions/request') waterfall 注册
+    const on = ctx.on as unknown as ReturnType<typeof vi.fn>
+    expect(on).toHaveBeenCalledWith('user-questions/request', expect.any(Function), { global: true })
     await app.dispose()
   })
 })
 
 describe('TuiApp T3.1 结构化提问结算', () => {
-  /** 装配带 userQuestions 服务的 app，返回 provider 引用。 */
+  /** 装配带 userQuestions 服务的 app，返回 provider 引用。
+   *  rc.1 wire：answerer 经 ctx.on('user-questions/request') 注册；provider.ask
+   *  以 waterfall 客户语义调用捕获的监听器（next 委托到不存在的下游即抛错）。 */
   async function bootQuestionApp() {
     const ctx = makeCtx()
-    let provider: { ask: (request: unknown) => Promise<unknown> } | null = null
-    ctx.reflect.get.mockImplementation((name: string) => {
-      if (name === 'userQuestions') return {
-        registerProvider: (p: { ask: (request: unknown) => Promise<unknown> }) => {
-          provider = p
-          return () => { }
-        },
-      }
-      return undefined
-    })
     const agent = makeAgent('q-1')
     ctx.agents.create.mockResolvedValue(makeHandle(agent))
     ctx.sessions.get.mockReturnValue(agent.session)
@@ -4672,7 +4684,18 @@ describe('TuiApp T3.1 结构化提问结算', () => {
     const stdout = makeStdout()
     const app = new TuiApp({ ctx, stdout, stdin })
     await app.attach()
-    return { app, stdin, stdout, provider: () => provider }
+    const onCalls = (ctx.on as unknown as ReturnType<typeof vi.fn>).mock.calls as Array<[string, unknown]>
+    const provider = (): { ask: (request: unknown) => Promise<unknown> } | null => {
+      const reg = onCalls.find(([name]) => name === 'user-questions/request')
+      if (reg === undefined) return null
+      const answerer = reg[1] as (request: unknown, next: () => Promise<unknown>) => Promise<unknown>
+      return {
+        ask: (request: unknown) => answerer(request, async () => {
+          throw new Error('no downstream answerer')
+        }),
+      }
+    }
+    return { app, stdin, stdout, provider }
   }
 
   it('ask 挂起 → 数字键选选项结算（resolve 带选项值）', async () => {
@@ -6671,8 +6694,8 @@ describe('C4 概念稿 菜单快捷键与三行底部区（提交后审查补测
     })
     ctx.sessions.list.mockReturnValue([
       // SessionManager.list 读 session.events.length——mock 必须带 events 数组
-      { id: oldS, header: headerOf(oldS, Date.now() - 3_600_000), events: [] },
-      { id: newS, header: headerOf(newS, Date.now() - 1_000), events: [] },
+      { id: oldS, header: headerOf(oldS, Date.now() - 3_600_000), events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] } },
+      { id: newS, header: headerOf(newS, Date.now() - 1_000), events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] } },
     ])
     // registry 兜底路径（agents.get 恒返回 agent）：attach 的 switchSession(oldS)
     // 与 ctrl_s 的 switchSession(newS) 都经 agents.get 探测，不触发 resume。

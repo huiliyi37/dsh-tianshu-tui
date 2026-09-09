@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import {
   applyTurnEvent,
   emptyTurnSummary,
@@ -10,28 +11,28 @@ import {
 } from '../src/turn-summary.ts'
 
 function turnStart(seq: number, turn: number): SessionEvent {
-  return { seq, time: 1000 + seq, type: 'turn/start', data: { turn } }
+  return { seq: SessionSeq(seq), time: 1000 + seq, type: 'turn/start', data: { turn } }
 }
 
 function toolCall(seq: number, callId: string, name: string, turn: number, step: number): SessionEvent {
   return {
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/call',
-    data: { callId: callId as CallId, name, arguments: '{}', turn, step },
+    data: { callId: callId as ToolCallId, name, arguments: '{}', turn, step },
   }
 }
 
 function toolResult(seq: number, callId: string, error?: { name: string; code: string }, turn = 1): SessionEvent {
   return {
-    seq,
+    seq: SessionSeq(seq),
     time: 1000 + seq,
     type: 'tool/result',
     data: {
       turn,
       step: 0,
       message: {
-        source: { kind: 'tool', callId: callId as CallId },
+        source: { kind: 'tool', callId: callId as ToolCallId },
         content: [{ type: 'tool-result', toolCallId: callId, content: [] }],
       },
       ...(error === undefined ? {} : { error }),

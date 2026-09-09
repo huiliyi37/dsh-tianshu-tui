@@ -63,7 +63,7 @@ function makeAgent(id: string): Agent {
     session: {
       id: SessionId(id),
       header: { id: SessionId(id), version: 0, createdAt: 1 },
-      events: [],
+      events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
       requestHeader: vi.fn(() => undefined),
       requestContext: vi.fn(() => undefined),
     },
@@ -113,28 +113,25 @@ async function bootApprovalApp() {
   return { app, stdin, request }
 }
 
-/** 装配带 userQuestions 服务的 app（镜像 app.spec.ts bootQuestionApp）。 */
+/** 装配带 userQuestions 服务的 app（镜像 app.spec.ts bootQuestionApp）。
+ *  rc.1 wire：answerer 经 ctx.on('user-questions/request') 注册，捕获后以
+ *  waterfall 客户语义暴露 ask。 */
 async function bootQuestionApp() {
   const ctx = makeCtx()
-  let provider: { ask: (request: unknown) => Promise<unknown> } | null = null
-  ctx.reflect.get.mockImplementation((name: string) => {
-    if (name === 'userQuestions') return {
-      registerProvider: (p: { ask: (request: unknown) => Promise<unknown> }) => {
-        provider = p
-        return () => { }
-      },
-    }
-    return undefined
-  })
   const agent = makeAgent('absorb-q')
   ctx.agents.create.mockResolvedValue({ agent, dispose: vi.fn() } as unknown as AgentHandle)
   ctx.sessions.get.mockReturnValue(agent.session)
   const stdin = makeStdin()
   const app = new TuiApp({ ctx, stdout: makeStdout(), stdin })
   await app.attach()
-  if (provider === null) throw new Error('userQuestions provider not registered')
-  const ask = provider as { ask: (request: unknown) => Promise<unknown> }
-  return { app, stdin, ask: ask.ask.bind(ask) }
+  const onCalls = (ctx.on as unknown as ReturnType<typeof vi.fn>).mock.calls as Array<[string, unknown]>
+  const reg = onCalls.find(([name]) => name === 'user-questions/request')
+  if (reg === undefined) throw new Error('userQuestions answerer not registered')
+  const answerer = reg[1] as (request: unknown, next: () => Promise<unknown>) => Promise<unknown>
+  const ask = (request: unknown): Promise<unknown> => answerer(request, async () => {
+    throw new Error('no downstream answerer')
+  })
+  return { app, stdin, ask }
 }
 
 afterEach(() => {

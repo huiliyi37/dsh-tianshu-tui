@@ -74,7 +74,7 @@ function makeAgent(id: string): Agent & { cancel: ReturnType<typeof vi.fn>; foll
   return {
     id: SessionId(id),
     options: {},
-    session: { id: SessionId(id), header: { id: SessionId(id), version: 0, createdAt: 1 }, events: [], requestHeader: vi.fn(() => undefined), requestContext: vi.fn(() => undefined) },
+    session: { id: SessionId(id), header: { id: SessionId(id), version: 0, createdAt: 1, isSeeded: false }, events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] }, requestHeader: vi.fn(() => undefined), requestContext: vi.fn(() => undefined) },
     inbox: { nextTurn: [], nextStep: [] },
     status: 'idle',
     ctx: { reflect: { get: vi.fn(() => undefined) } },

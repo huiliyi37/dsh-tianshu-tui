@@ -12,9 +12,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { SessionManager } from '../src/controllers/session-manager.js'
 
-/** 最小 live session 替身（events 长度可配）。 */
-function makeSession(id: string, eventCount = 0): { id: SessionId; events: unknown[] } {
-  return { id: SessionId(id), events: new Array(eventCount) }
+/** 最小 live session 替身（events 长度可配；rc.1 wire 走 snapshotEvents）。 */
+function makeSession(id: string, eventCount = 0): { id: SessionId; events: unknown[]; snapshotEvents(): unknown[] } {
+  const events = new Array(eventCount)
+  return { id: SessionId(id), events, snapshotEvents: () => events }
 }
 
 function makeCtx(opts: {

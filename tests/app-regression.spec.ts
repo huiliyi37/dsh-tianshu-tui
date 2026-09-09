@@ -103,7 +103,7 @@ function makeAgent(id: string): Agent {
     session: {
       id: SessionId(id),
       header: { id: SessionId(id), version: 0, createdAt: 1 },
-      events: [],
+      events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
       requestHeader: vi.fn(() => undefined),
       requestContext: vi.fn(() => undefined),
     },
@@ -165,19 +165,21 @@ describe('TuiApp 生命周期缺陷回归', () => {
     await app.dispose()
   })
 
-  it('dispose 释放 userQuestions provider 的 disposer（泄漏修复）', async () => {
+  it('dispose 释放 userQuestions answerer 的 disposer（泄漏修复）', async () => {
     const ctx = makeCtx()
-    const disposer = vi.fn(() => { })
-    ctx.reflect.get.mockImplementation((name: string) => {
-      if (name === 'userQuestions') return { registerProvider: vi.fn(() => disposer) }
-      return undefined
-    })
     const agent = makeAgent('disposer-1')
     ctx.agents.create.mockResolvedValue(makeHandle(agent))
     ctx.sessions.get.mockReturnValue(agent.session)
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
     await app.attach()
 
+    // rc.1 wire：answerer 经 ctx.on('user-questions/request') 注册，disposer 由
+    // ctx.on 返回。取该次注册对应的返回值，断言 dispose 时释放。
+    const on = ctx.on as unknown as ReturnType<typeof vi.fn>
+    const idx = on.mock.calls.findIndex((c: unknown[]) => c[0] === 'user-questions/request')
+    expect(idx).toBeGreaterThanOrEqual(0)
+    const disposer = on.mock.results[idx]?.value as (() => void) | undefined
+    expect(disposer).toBeTypeOf('function')
     expect(disposer).not.toHaveBeenCalled()
     await app.dispose()
     expect(disposer).toHaveBeenCalledTimes(1)

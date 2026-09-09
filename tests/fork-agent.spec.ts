@@ -10,7 +10,7 @@ describe('createForkedAgent setup', () => {
     const composeFrom = vi.fn(() => 'standard')
     const parentCtx = { parent: 1 }
     const parent = {
-      events: [],
+      events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
       header: { cwd: '/w' },
       requestHeader: () => undefined,
     }

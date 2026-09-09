@@ -23,17 +23,21 @@ describe('liveForkSeed', () => {
 
 describe('forkAgentSpec', () => {
   it('拼 seed + 血缘 meta；cwd 缺失回落 fallback', () => {
+    const log = [ev('turn/start'), ev('turn/end')]
     const parent = {
       id: 'session-parent' as SessionId,
-      header: { id: 'session-parent', version: 0, createdAt: 1 },
-      events: [ev('turn/start'), ev('turn/end')],
+      header: { id: 'session-parent', version: 0, createdAt: 1, isSeeded: false },
+      events: log,
+      snapshotEvents: () => log,
     } as unknown as Session
     const spec = forkAgentSpec(parent, '/ws')
     expect(spec.seed).toHaveLength(2)
+    // rc.1 wire：seedLength 变为 meta.isSeeded 标记 + 顶层 inheritedEventCount
     expect(spec.meta).toEqual({
       cwd: '/ws',
       parentSession: 'session-parent',
-      seedLength: 2,
+      isSeeded: true,
     })
+    expect(spec.inheritedEventCount).toBe(2)
   })
 })

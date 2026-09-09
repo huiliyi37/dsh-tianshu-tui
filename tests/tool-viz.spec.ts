@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { CallId } from '@deepseek-ai/dsh-llm'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { RivetTheme } from '../src/theme.js'
 import { getToolColorFamily, toolFamilyColor } from '../src/format/tool-family.js'
 import { emptyToolTimer, applyToolTimerEvent, toolElapsedMs, formatElapsed } from '../src/format/tool-meta.js'
@@ -132,41 +132,41 @@ describe('formatElapsed — 精确耗时（迁移自 tool-elapsed 合并）', ()
 
 describe('工具计时状态机（7.1 tool/call → tool/result）', () => {
   it('空状态无计时记录', () => {
-    expect(toolElapsedMs(emptyToolTimer(), 'c1' as CallId, 0)).toBeUndefined()
+    expect(toolElapsedMs(emptyToolTimer(), 'c1' as ToolCallId, 0)).toBeUndefined()
   })
 
   it('tool/call 后按当前时间实时计时', () => {
     let s = emptyToolTimer()
-    s = applyToolTimerEvent(s, { type: 'tool-call', time: 1000, callId: 'c1' as CallId })
-    expect(toolElapsedMs(s, 'c1' as CallId, 2500)).toBe(1500)
+    s = applyToolTimerEvent(s, { type: 'tool-call', time: 1000, callId: 'c1' as ToolCallId })
+    expect(toolElapsedMs(s, 'c1' as ToolCallId, 2500)).toBe(1500)
   })
 
   it('tool/result 停止并定格耗时（不再随 now 增长）', () => {
     let s = emptyToolTimer()
-    s = applyToolTimerEvent(s, { type: 'tool-call', time: 1000, callId: 'c1' as CallId })
-    s = applyToolTimerEvent(s, { type: 'tool-result', time: 2500, callId: 'c1' as CallId })
-    expect(toolElapsedMs(s, 'c1' as CallId, 999_999)).toBe(1500)
+    s = applyToolTimerEvent(s, { type: 'tool-call', time: 1000, callId: 'c1' as ToolCallId })
+    s = applyToolTimerEvent(s, { type: 'tool-result', time: 2500, callId: 'c1' as ToolCallId })
+    expect(toolElapsedMs(s, 'c1' as ToolCallId, 999_999)).toBe(1500)
   })
 
   it('未知 callId 的 result 是纯投影 no-op（不产生新状态）', () => {
     const s = emptyToolTimer()
-    expect(applyToolTimerEvent(s, { type: 'tool-result', time: 1000, callId: 'ghost' as CallId })).toBe(s)
+    expect(applyToolTimerEvent(s, { type: 'tool-result', time: 1000, callId: 'ghost' as ToolCallId })).toBe(s)
   })
 
   it('并行工具独立计时', () => {
     let s = emptyToolTimer()
-    s = applyToolTimerEvent(s, { type: 'tool-call', time: 1000, callId: 'c1' as CallId })
-    s = applyToolTimerEvent(s, { type: 'tool-call', time: 2000, callId: 'c2' as CallId })
-    expect(toolElapsedMs(s, 'c1' as CallId, 3000)).toBe(2000)
-    expect(toolElapsedMs(s, 'c2' as CallId, 3000)).toBe(1000)
+    s = applyToolTimerEvent(s, { type: 'tool-call', time: 1000, callId: 'c1' as ToolCallId })
+    s = applyToolTimerEvent(s, { type: 'tool-call', time: 2000, callId: 'c2' as ToolCallId })
+    expect(toolElapsedMs(s, 'c1' as ToolCallId, 3000)).toBe(2000)
+    expect(toolElapsedMs(s, 'c2' as ToolCallId, 3000)).toBe(1000)
   })
 
   it('重复 result 幂等（保留首次定格值）', () => {
     let s = emptyToolTimer()
-    s = applyToolTimerEvent(s, { type: 'tool-call', time: 1000, callId: 'c1' as CallId })
-    s = applyToolTimerEvent(s, { type: 'tool-result', time: 1500, callId: 'c1' as CallId })
-    s = applyToolTimerEvent(s, { type: 'tool-result', time: 2000, callId: 'c1' as CallId })
-    expect(toolElapsedMs(s, 'c1' as CallId, 999)).toBe(500)
+    s = applyToolTimerEvent(s, { type: 'tool-call', time: 1000, callId: 'c1' as ToolCallId })
+    s = applyToolTimerEvent(s, { type: 'tool-result', time: 1500, callId: 'c1' as ToolCallId })
+    s = applyToolTimerEvent(s, { type: 'tool-result', time: 2000, callId: 'c1' as ToolCallId })
+    expect(toolElapsedMs(s, 'c1' as ToolCallId, 999)).toBe(500)
   })
 })
 

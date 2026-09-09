@@ -68,7 +68,7 @@ function makeAgent(id: string): Agent & { followup: ReturnType<typeof vi.fn> } {
     session: {
       id: SessionId(id),
       header: { id: SessionId(id), version: 0, createdAt: 1 },
-      events: [],
+      events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
       requestHeader: vi.fn(() => undefined),
       requestContext: vi.fn(() => undefined),
       append: vi.fn(),

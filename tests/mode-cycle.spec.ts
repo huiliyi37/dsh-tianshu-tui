@@ -53,7 +53,7 @@ function makeAgent(name: string): Agent {
     id: `agent-${name}`,
     session: {
       id: `session-${name}` as SessionId,
-      events: [],
+      events: [], snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
       requestHeader: vi.fn(() => undefined),
       requestContext: vi.fn(() => undefined),
     },
