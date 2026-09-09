@@ -10,7 +10,7 @@
 
 ![dsh-tianshu-tui](docs/promo.png)
 
-**dsh-tianshu-tui**（`@huiliyi37/dsh-tianshu-tui`）是官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 上的交互式终端 UI 插件。渲染核心为自研的 ANSI 极简引擎（由作者自己的开源项目 [天枢 Tianshu-harness](https://github.com/huiliyi37/Tianshu-harness) 演进而来，Apache-2.0；逐文件来源见 [SOURCE-MAP.md](SOURCE-MAP.md)），渲染轻量不打断，使用体验流畅。UI 是纯展示层：所有 agent 状态都来自会话事件流。在此之上做了 harness 工程层的个性化改造，如图像与视觉桥接、代码智能检索、记忆与跨会话召回等。
+**dsh-tianshu-tui**是官方 [DeepSeek Harness] 上的交互式终端 TUI 面板插件。渲染核心为自研极简 ANSI引擎，轻量渲染使用体验极度流畅。（由作者的[天枢 Tianshu-harness] 演进而来。UI 是纯展示层：所有 agent 状态都来自会话事件流，流式 Markdown/工具卡、16+ 主题、slash 命令与选择器、输入历史与本地偏好持久化、LSP 诊断。在此之上做了工程层的改造，如图像与视觉桥接、代码智能检索、memory记忆与跨会话召回等。
 
 
 > [!WARNING]
