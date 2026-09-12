@@ -436,8 +436,8 @@ describe('TuiApp agent-ensure 三分支', () => {
       .map(call => call[1] as ((owner: { id: SessionId }, event: SessionEvent) => void))
     if (feedHandlers.length === 0) throw new Error('session/event handlers not registered')
     const liveEvent = {
-      seq: 999, time: 999, type: 'assistant/chunk',
-      data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: `实时正文${'X'.repeat(36)}\n\n尾` } },
+      seq: 999, time: 999, type: 'assistant/attempt',
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 999, chunk: { type: 'text-delta', text: `实时正文${'X'.repeat(36)}\n\n尾` } }] },
     } as unknown as SessionEvent
     for (const handler of feedHandlers) handler({ id: SessionId('big-1') }, liveEvent)
 
@@ -629,8 +629,12 @@ describe('TuiApp 启动复用（上一个空会话 id 复用 + cwd 重绑启动�
     // 同目录复用同样先清 artifact（adopt 会因 meta 事件前缀不一致被宿主拒绝）。
     const locate = vi.fn(() => ({ path: '/tmp/dsh-reuse-test-never-exists/session-empty-1/session.jsonl' }))
     withPersistence(ctx, {
-      list: vi.fn(async () => [oldHeader]),
-      readFrom: vi.fn(async () => ({ events: [] })),
+      // 0.1.5 契约：list 返回快照包装；读走 open(id,'read') + handle.read()
+      list: vi.fn(async () => [{ header: oldHeader }]),
+      open: vi.fn(async () => ({
+        read: vi.fn(async () => ({ events: [] })),
+        close: vi.fn(async () => { }),
+      })),
       locate,
     })
 
@@ -651,8 +655,11 @@ describe('TuiApp 启动复用（上一个空会话 id 复用 + cwd 重绑启动�
     wireLiveAfterCreate(ctx, agent)
     const oldHeader = { id: SessionId('session-empty-1b'), version: 0, createdAt: 5, cwd: process.cwd() }
     withPersistence(ctx, {
-      list: vi.fn(async () => [oldHeader]),
-      readFrom: vi.fn(async () => ({ events: [] })),
+      list: vi.fn(async () => [{ header: oldHeader }]),
+      open: vi.fn(async () => ({
+        read: vi.fn(async () => ({ events: [] })),
+        close: vi.fn(async () => { }),
+      })),
     })
 
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
@@ -669,8 +676,12 @@ describe('TuiApp 启动复用（上一个空会话 id 复用 + cwd 重绑启动�
     const oldHeader = { id: SessionId('session-empty-2'), version: 0, createdAt: 5, cwd: '/old/project' }
     const locate = vi.fn(() => ({ path: '/tmp/dsh-reuse-test-never-exists/session-empty-2/session.jsonl' }))
     withPersistence(ctx, {
-      list: vi.fn(async () => [oldHeader]),
-      readFrom: vi.fn(async () => ({ events: [] })),
+      // 0.1.5 契约：list 返回快照包装；读走 open(id,'read') + handle.read()
+      list: vi.fn(async () => [{ header: oldHeader }]),
+      open: vi.fn(async () => ({
+        read: vi.fn(async () => ({ events: [] })),
+        close: vi.fn(async () => { }),
+      })),
       locate,
     })
 
@@ -691,8 +702,11 @@ describe('TuiApp 启动复用（上一个空会话 id 复用 + cwd 重绑启动�
     wireLiveAfterCreate(ctx, agent)
     const oldHeader = { id: SessionId('session-empty-3'), version: 0, createdAt: 5, cwd: '/old/project' }
     withPersistence(ctx, {
-      list: vi.fn(async () => [oldHeader]),
-      readFrom: vi.fn(async () => ({ events: [] })),
+      list: vi.fn(async () => [{ header: oldHeader }]),
+      open: vi.fn(async () => ({
+        read: vi.fn(async () => ({ events: [] })),
+        close: vi.fn(async () => { }),
+      })),
     })
 
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
@@ -761,7 +775,7 @@ describe('TuiApp 模型定路', () => {
     expect(setup).toBeTypeOf('function')
     const agentCtx = { on: vi.fn((_name: string, _handler: unknown) => () => { }) }
     setup?.(agentCtx)
-    expect(agentCtx.on.mock.calls.map(call => call[0])).toEqual(['system-prompt/assemble', 'agent/request'])
+    expect(agentCtx.on.mock.calls.map(call => call[0])).toEqual(['system-prompt/assemble', 'agent/request', 'agent/pre-step'])
     await app.dispose()
   })
 
@@ -2661,7 +2675,7 @@ describe('TuiApp 流式提交', () => {
     if (id === null) throw new Error('no active session')
     const emit = sessionEventBus(ctx)
     emit(id, { seq: 1, time: 1, type: 'turn/start', data: { turn: 1 } })
-    emit(id, { seq: 2, time: 2, type: 'assistant/chunk', data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: '流式回复文本' } } })
+    emit(id, { seq: 2, time: 2, type: 'assistant/attempt', data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 2, chunk: { type: 'text-delta', text: '流式回复文本' } }] } })
     emit(id, { seq: 3, time: 3, type: 'assistant/message', data: { turn: 1, step: 0, message: { role: 'assistant', content: [{ type: 'text', text: '流式回复文本' }] } } })
     await new Promise(resolve => setImmediate(resolve))
 
@@ -2682,7 +2696,7 @@ describe('TuiApp 流式提交', () => {
     if (id === null) throw new Error('no active session')
     const emit = sessionEventBus(ctx)
     emit(id, { seq: 1, time: 1, type: 'turn/start', data: { turn: 1 } })
-    emit(id, { seq: 2, time: 2, type: 'assistant/chunk', data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: '不应出现的残文' } } })
+    emit(id, { seq: 2, time: 2, type: 'assistant/attempt', data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 2, chunk: { type: 'text-delta', text: '不应出现的残文' } }] } })
     app.handleAbort()
     emit(id, { seq: 3, time: 3, type: 'turn/end', data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } } })
     await new Promise(resolve => setImmediate(resolve))
@@ -4879,22 +4893,22 @@ describe('TuiApp 会话事件流防御分支', () => {
   it('session/event 其他会话 owner → 订阅过滤不处理', async () => {
     const { app, fire } = await bootEventApp()
     fire('session/event', { id: SessionId('session-other') }, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 0,
       time: 1,
-      data: { chunk: { type: 'text-delta', text: '应被过滤' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: '应被过滤' } }] },
     })
     await new Promise(resolve => setTimeout(resolve, 30))
     await app.dispose()
   })
 
-  it('assistant/chunk 非 text-delta → 跳过 blockWriter（分支 2）', async () => {
+  it('assistant/attempt 非增量记录 → 跳过 blockWriter（分支 2）', async () => {
     const { app, owner, fire } = await bootEventApp()
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 0,
       time: 1,
-      data: { chunk: { type: 'tool-call', text: 'x' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'tool-call', text: 'x' } }] },
     })
     await new Promise(resolve => setImmediate(resolve))
     await app.dispose()
@@ -4906,10 +4920,10 @@ describe('TuiApp 会话事件流防御分支', () => {
     // blockWriter minChars 60 > 文本长度 → 走 idleMs 180ms 超时吐块，等 300ms 覆盖
     // 吐块 + WriteBatcher 16ms 帧两段延迟。
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 0,
       time: 1,
-      data: { chunk: { type: 'text-delta', text: '你好，世界' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: '你好，世界' } }] },
     })
     await new Promise(resolve => setTimeout(resolve, 300))
     const written = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
@@ -4999,10 +5013,10 @@ describe('TuiApp 结算卡与推理通道', () => {
   it('tool/result → 结算卡实时 commit 进 scrollback（流式文本在前）', async () => {
     const { app, stdout, owner, fire } = await bootEventApp()
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 0,
       time: 1,
-      data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: '先看目录。\n\n' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: '先看目录。\n\n' } }] },
     })
     fire('session/event', owner, {
       type: 'tool/call',
@@ -5078,10 +5092,10 @@ describe('TuiApp 结算卡与推理通道', () => {
   it('reasoning-delta → live 思考尾巴可见；段结束折叠头行落底，正文不落', async () => {
     const { app, stdout, owner, fire } = await bootEventApp()
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 0,
       time: Date.now(),
-      data: { turn: 1, step: 0, chunk: { type: 'reasoning-delta', text: '先分析需求边界' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: Date.now(), chunk: { type: 'reasoning-delta', text: '先分析需求边界' } }] },
     })
     await new Promise(resolve => setTimeout(resolve, 30))
     const streaming = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
@@ -5092,10 +5106,10 @@ describe('TuiApp 结算卡与推理通道', () => {
     // scrollback，经 Ctrl+O 展开查看）。
     stdout.write.mockClear()
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 1,
       time: Date.now(),
-      data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: '结论是……' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: Date.now(), chunk: { type: 'text-delta', text: '结论是……' } }] },
     })
     await new Promise(resolve => setTimeout(resolve, 300))
     const settled = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
@@ -5131,16 +5145,16 @@ describe('TuiApp 结算卡与推理通道', () => {
     }
 
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 0,
       time: Date.now(),
-      data: { turn: 1, step: 0, chunk: { type: 'reasoning-delta', text: '展开可见的推理正文' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: Date.now(), chunk: { type: 'reasoning-delta', text: '展开可见的推理正文' } }] },
     })
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 1,
       time: Date.now(),
-      data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: '结论' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: Date.now(), chunk: { type: 'text-delta', text: '结论' } }] },
     })
     await new Promise(resolve => setTimeout(resolve, 300))
     stdout.write.mockClear()
@@ -5188,10 +5202,10 @@ describe('TuiApp 结算卡与推理通道', () => {
   it('abort → 推理缓冲丢弃不落底', async () => {
     const { app, stdout, owner, fire } = await bootEventApp()
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 0,
       time: Date.now(),
-      data: { turn: 1, step: 0, chunk: { type: 'reasoning-delta', text: '将被丢弃的思路' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: Date.now(), chunk: { type: 'reasoning-delta', text: '将被丢弃的思路' } }] },
     })
     await new Promise(resolve => setTimeout(resolve, 30))
     stdout.write.mockClear()
@@ -6850,10 +6864,10 @@ describe('TuiApp live 区高水位钉住输入轨', () => {
     })
     const chunk = Array.from({ length: 20 }, (_, i) => `思路步骤${i}`).join('\n')
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 1,
       time: Date.now(),
-      data: { turn: 1, step: 0, chunk: { type: 'reasoning-delta', text: chunk } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: Date.now(), chunk: { type: 'reasoning-delta', text: chunk } }] },
     })
     await new Promise(resolve => setTimeout(resolve, 30))
     const streaming = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
@@ -6861,10 +6875,10 @@ describe('TuiApp live 区高水位钉住输入轨', () => {
 
     stdout.write.mockClear()
     fire('session/event', owner, {
-      type: 'assistant/chunk',
+      type: 'assistant/attempt',
       seq: 2,
       time: Date.now(),
-      data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: '结论。' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: Date.now(), chunk: { type: 'text-delta', text: '结论。' } }] },
     })
     await new Promise(resolve => setTimeout(resolve, 300))
     const settled = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
@@ -7858,10 +7872,10 @@ describe('TuiApp 全屏 overlay 激活时 renderLive 不写屏（A6）', () => {
     const sessionHandlers = handlers.get('session/event') ?? []
     for (const handler of sessionHandlers) {
       handler(owner, {
-        type: 'assistant/chunk',
+        type: 'assistant/attempt',
         seq: 0,
         time: 1,
-        data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: '先看目录。\n\n' } },
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: '先看目录。\n\n' } }] },
       })
     }
     // blockWriter idleMs 180 + StreamRenderer 稳定边界 commit + 帧合并。

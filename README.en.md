@@ -32,7 +32,7 @@
 
 ## Install
 
-This package is not a standalone app. You need the official CLI [`@deepseek-ai/dsh`](https://www.npmjs.com/package/@deepseek-ai/dsh) (npm `latest`, currently `0.1.2-rc.1`; needs ≥ `0.1.2-rc.1`, aligned with the peer deps). `npm i` of this package alone will not run.
+This package is not a standalone app. You need the official CLI [`@deepseek-ai/dsh`](https://www.npmjs.com/package/@deepseek-ai/dsh) (npm `latest`, currently `0.1.5-rc.1`; needs ≥ `0.1.5-rc.1`, aligned with the peer deps). `npm i` of this package alone will not run.
 
 **One-click install (recommended)**: the repo ships cross-platform scripts that detect Node/pnpm, install the official CLI via pnpm, wire this plugin and launch (defaults to the npmmirror registry for CN networks):
 
@@ -81,7 +81,7 @@ If the official CLI is installed globally (`pnpm add -g @deepseek-ai/dsh`) and `
 
 ### 4. Agent presets (`/preset`)
 
-The command is `/preset` (there is no `/presets`). This bundle matches official web: it disables the host agent plane and mounts `@deepseek-ai/dsh-agent-presets` (pinned `0.1.2-rc.1`; npm `latest` still points at stale `0.0.1-rc.1`). Adding this plugin installs the roster; new sessions `mount` in `setup`. `/preset` switches the official shipped surface (standard / PTC / minimal / creative), rather than stacking on `dsh-base` tools.
+The command is `/preset` (there is no `/presets`). This bundle matches official web: it disables the host agent plane and mounts `@deepseek-ai/dsh-agent-presets` (pinned `0.1.5-rc.1`; npm `latest` still points at stale `0.0.1-rc.1`). Adding this plugin installs the roster; new sessions `mount` in `setup`. `/preset` switches the official shipped surface (standard / PTC / minimal / creative), rather than stacking on `dsh-base` tools.
 
 Usage:
 
@@ -123,7 +123,9 @@ The companion vision plugin lives in `vision-ask/` if you need image re-interrog
 
 ## Release notes
 
-Current npm `latest`: [`@huiliyi37/dsh-tianshu-tui@0.1.2-rc.29`](https://www.npmjs.com/package/@huiliyi37/dsh-tianshu-tui) ([GitHub Release](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v0.1.2-rc.29)).
+Current npm `latest`: [`@huiliyi37/dsh-tianshu-tui@0.1.2-rc.30`](https://www.npmjs.com/package/@huiliyi37/dsh-tianshu-tui) ([GitHub Release](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v0.1.2-rc.30)).
+
+**0.1.2-rc.30 (2026-09-12)**: host line moves to 0.1.5 (official `latest` is now 0.1.5-rc.1) — streaming events `assistant/chunk`→batched `assistant/attempt`, the new sessionPersistence contract (snapshot list + open/read handles), defensive rendering for missing timestamps in cross-format stores; real-machine pty e2e green. ⚠ Requires host ≥ 0.1.5-rc.1.
 
 **0.1.2-rc.29 (2026-09-09)**: host line moves to 0.1.2-rc.1 (now the official `latest`; fixes #56 boot crash) — `Session.events` removal adapted to `snapshotEvents()`, userQuestions migrated to a waterfall answerer (global registration), `CallId→ToolCallId`, preset `code→ptc`, fork lineage via `isSeeded`+`inheritedEventCount`, bundle patch gains `subagent-model-selection-settings`; older hosts (≤0.1.1-rc.2) fail loud at startup with upgrade/rollback guidance. ⚠ This release requires host ≥ 0.1.2-rc.1.
 
@@ -133,7 +135,6 @@ Current npm `latest`: [`@huiliyi37/dsh-tianshu-tui@0.1.2-rc.29`](https://www.npm
 
 **0.1.2-rc.26 (2026-08-28)**: the P1 polish six-pack — Esc layering finished (post-abort grace period + armed hint line), a playful verb pool on the glance line, explicit priority-based footer degradation, error recovery hints (every error names the next action), a steadier fixed-height viewport (chrome panels no longer jolt the input track), and fish-style history ghost suggestions (`→` to accept); `/scroll` cap now configurable.
 
-**0.1.2-rc.25 (2026-08-28)**: the P0 interaction trio — unified action registry for keybindings/commands/hints (app.ts ratchet 4359→4140), six-tier approval decisions (new `p` command-prefix whitelist and `f` reject-with-feedback, bash approvals now show the command preview with danger annotations), and mid-turn message queueing (`↑` recall, `Ctrl+Enter` cancel-and-send, abort keeps the queue); plus the `/scroll` pager, completion bell, vim insert remaps, and theme contrast checks.
 
 
 **0.1.2-rc.23 (2026-08-27)**: LSP trio aligned to the tianshu-public 0.6.0 official seam line (single `lsp` tool with four operations + local provider defaulting to tsserver), capability-gated diagnostic source prevents `/lsp` panel regression; host peers aligned to `^0.1.1-rc.2`.

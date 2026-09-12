@@ -26,6 +26,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import type { AgentHandle } from '@deepseek-ai/dsh-agent'
 import { controlsFromHandle } from '../adapter/send.js'
 import { joinPreset, presetJoinFacet } from '../adapter/preset-join.js'
@@ -150,15 +151,27 @@ export class BtwController {
         })
       },
     })
-    // 答案流订阅：text-delta 收集进 buffer，turn/end 定稿（与主会话 streamFeed
+    // 答案流订阅：attempt 增量收集进 buffer，turn/end 定稿（与主会话 streamFeed
     // 同款事件词汇，按 btw session id 过滤，互不干扰）。
+    // rc.2 起 attempt 事件可能整体缺席（即时完成的流不落增量），此时答案只在
+    // assistant/message 的正文里——turn/end 时优先流式 buffer，回退消息正文。
     const buffer: string[] = []
+    const messageText: string[] = []
     const feed = this.ctx.on('session/event', (owner: { id: SessionId }, event: SessionEvent) => {
       if (owner.id !== btwId) return
-      if (event.type === 'assistant/chunk' && event.data.chunk.type === 'text-delta') {
-        buffer.push(event.data.chunk.text)
+      // 0.1.5：text delta 走批量 assistant/attempt（压缩流记录展开）
+      if (event.type === 'assistant/attempt') {
+        for (const { chunk } of expandAssistantStream(event.data.stream)) {
+          if (chunk.type === 'text-delta') buffer.push(chunk.text)
+        }
+      } else if (event.type === 'assistant/message') {
+        const message = (event.data as { message?: { content?: ReadonlyArray<{ type: string; text?: string }> } }).message
+        for (const block of message?.content ?? []) {
+          if (block.type === 'text' && block.text !== undefined) messageText.push(block.text)
+        }
       } else if (event.type === 'turn/end') {
-        this.finish(buffer.join(''))
+        const streamed = buffer.join('')
+        this.finish(streamed.length > 0 ? streamed : messageText.join(''))
       }
     })
     this.handle = handle

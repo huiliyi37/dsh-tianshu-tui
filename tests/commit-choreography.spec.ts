@@ -139,8 +139,8 @@ describe('mid-stream 提交原子编舞（输入框闪烁守卫）', () => {
     // 段界条件，app 装配 minChars=60）；首块门槛 minChars 已放宽到 15。
     emit(id, { seq: 1, time: 1, type: 'turn/start', data: { turn: 1 } })
     emit(id, {
-      seq: 2, time: 2, type: 'assistant/chunk',
-      data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: `落底标记甲${'甲'.repeat(30)}\n\n尾段未完` } },
+      seq: 2, time: 2, type: 'assistant/attempt',
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 2, chunk: { type: 'text-delta', text: `落底标记甲${'甲'.repeat(30)}\n\n尾段未完` } }] },
     })
     await new Promise(resolve => setImmediate(resolve))
 
@@ -159,13 +159,13 @@ describe('mid-stream 提交原子编舞（输入框闪烁守卫）', () => {
     const id = app.sessionId as SessionId
     emit(id, { seq: 1, time: 1, type: 'turn/start', data: { turn: 1 } })
     emit(id, {
-      seq: 2, time: 2, type: 'assistant/chunk',
-      data: { turn: 1, step: 0, chunk: { type: 'reasoning-delta', text: '先想想怎么修闪烁问题' } },
+      seq: 2, time: 2, type: 'assistant/attempt',
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 2, chunk: { type: 'reasoning-delta', text: '先想想怎么修闪烁问题' } }] },
     })
     // 正文 delta 是思考段的段边界：commitReasoningBlock 整块落底。
     emit(id, {
-      seq: 3, time: 3, type: 'assistant/chunk',
-      data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: '正文开始' } },
+      seq: 3, time: 3, type: 'assistant/attempt',
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 3, chunk: { type: 'text-delta', text: '正文开始' } }] },
     })
     await new Promise(resolve => setImmediate(resolve))
 
@@ -186,8 +186,8 @@ describe('mid-stream 提交原子编舞（输入框闪烁守卫）', () => {
     const id = app.sessionId as SessionId
     emit(id, { seq: 1, time: 1, type: 'turn/start', data: { turn: 1 } })
     emit(id, {
-      seq: 2, time: 2, type: 'assistant/chunk',
-      data: { turn: 1, step: 0, chunk: { type: 'text-delta', text: `再落一段${'乙'.repeat(30)}\n\n完了` } },
+      seq: 2, time: 2, type: 'assistant/attempt',
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 2, chunk: { type: 'text-delta', text: `再落一段${'乙'.repeat(30)}\n\n完了` } }] },
     })
     await new Promise(resolve => setImmediate(resolve))
 

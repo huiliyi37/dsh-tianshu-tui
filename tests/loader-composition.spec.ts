@@ -118,9 +118,10 @@ async function boot(opts?: { withGoalSubagent?: boolean }): Promise<Booted> {
   const stdin = makeStdin()
   let tuiCtx: Context | undefined
 
-  // 场景不驱动任何模型调用：空 fixture（0 条录制脚本）即合法，真调用会 fail loud。
+  // 场景不驱动任何模型调用：fixture 带 session 头、0 条录制脚本即合法，真调用会 fail loud。
+  // （rc.2 起 llm-replay 拒绝空文件：快照必须以 session header 开头。）
   const fixturePath = join(root, 'session.jsonl')
-  await writeFile(fixturePath, '')
+  await writeFile(fixturePath, JSON.stringify({ type: 'session', version: 0, id: 'loader-comp-1', createdAt: 0 }) + '\n')
 
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [

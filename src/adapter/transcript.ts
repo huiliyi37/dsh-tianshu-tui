@@ -15,6 +15,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolCallId, ContentBlock } from '@deepseek-ai/dsh-llm'
+import { expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 
 /** One completed message row on the TUI surface. */
@@ -141,18 +142,21 @@ export function applyTranscriptEvent(view: TranscriptView, event: SessionEvent):
         ...(base.firstInTurnTime === undefined ? { firstInTurnTime: event.time } : {}),
       }
     }
-    case 'assistant/chunk': {
-      const { turn, step, chunk } = event.data
+    case 'assistant/attempt': {
+      // 0.1.5：逐 delta 的 assistant/chunk 改为批量 attempt（压缩流记录），
+      // 经官方 expandAssistantStream 展开后按同款语义折叠。
+      const { turn, step } = event.data
       // Visible text and reasoning accumulate on separate lanes: mixing them
       // would leak the model's draft stream into the rendered answer.
-      const text = chunk.type === 'text-delta' ? chunk.text : ''
-      const reasoning = chunk.type === 'reasoning-delta' ? chunk.text : ''
-      const current = base.streaming
-      // A chunk for a different step opens a fresh aggregation; same step accumulates.
-      const streaming = current !== undefined && current.turn === turn && current.step === step
-        ? { ...current, text: current.text + text, reasoning: current.reasoning + reasoning }
-        : { turn, step, text, reasoning }
-      return { ...base, streaming }
+      // A batch for a different step opens a fresh aggregation; same step accumulates.
+      let acc = base.streaming !== undefined && base.streaming.turn === turn && base.streaming.step === step
+        ? { ...base.streaming }
+        : { turn, step, text: '', reasoning: '' }
+      for (const { chunk } of expandAssistantStream(event.data.stream)) {
+        if (chunk.type === 'text-delta') acc = { ...acc, text: acc.text + chunk.text }
+        else if (chunk.type === 'reasoning-delta') acc = { ...acc, reasoning: acc.reasoning + chunk.text }
+      }
+      return { ...base, streaming: acc }
     }
     case 'assistant/message': {
       const { turn, step, message } = event.data

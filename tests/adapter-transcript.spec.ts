@@ -20,12 +20,13 @@ function userMessage(seq: number, text: string, _turn = 0): SessionEvent {
 }
 
 function chunk(seq: number, turn: number, step: number, text: string, kind: 'text-delta' | 'reasoning-delta' = 'text-delta'): SessionEvent {
+  // 0.1.5：流式增量打包为 assistant/attempt（原始 chunk 记录形态）
   return ev({
     seq: SessionSeq(seq),
     time: 1000 + seq,
-    type: 'assistant/chunk',
-    data: { turn, step, chunk: { type: kind, text } },
-  } as SessionEvent)
+    type: 'assistant/attempt',
+    data: { turn, step, stream: [{ type: 'chunk', time: 1000 + seq, chunk: { type: kind, text } }] },
+  } as unknown as SessionEvent)
 }
 
 function assistantMessage(seq: number, turn: number, step: number, text: string): SessionEvent {
@@ -52,10 +53,16 @@ function toolResult(seq: number, callId: string, _content: string, error?: { nam
     time: 1000 + seq,
     type: 'tool/result',
     data: {
-      message: { content: [{ type: 'tool', toolCallId: callId }] },
+      turn: 0,
+      step: 0,
+      message: {
+        role: 'user',
+        source: { kind: 'tool', callId: callId as ToolCallId },
+        content: [{ type: 'tool', toolCallId: callId }],
+      },
       ...(error === undefined ? {} : { error }),
     },
-  } as SessionEvent)
+  } as unknown as SessionEvent)
 }
 
 function turnStart(seq: number, turn: number): SessionEvent {
@@ -111,9 +118,9 @@ describe('applyTranscriptEvent', () => {
     view = applyTranscriptEvent(view, ev({
       seq: SessionSeq(1),
       time: 1001,
-      type: 'assistant/chunk',
-      data: { turn: 1, step: 0, chunk: { type: 'block-start', index: 0, blockType: 'text' } },
-    }))
+      type: 'assistant/attempt',
+      data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1001, chunk: { type: 'block-start', index: 0, blockType: 'text' } }] },
+    } as unknown as SessionEvent))
     expect(view.streaming).toMatchObject({ turn: 1, step: 0, text: '' })
   })
 

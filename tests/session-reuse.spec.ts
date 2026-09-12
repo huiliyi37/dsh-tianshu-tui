@@ -2,7 +2,7 @@
  * session-reuse.spec.ts — 启动复用适配层（adapter/sessions.ts 新增面）。
  *
  * 覆盖：最近空会话查找（标题折叠「新对话」= 无内容；读取失败跳过；走
- * readFrom 而非 inspect——inspect 会给该身份建档，随后同 id create 会被
+ * open(id,'read') detached 读而非 live 挂载——避免给该身份建档，随后同 id create 会被
  * 协调器判 "persisted state already owns this identity"）、跨 cwd 复用的旧
  * artifact 清理（locate + rm；无 locate/list 失败/删除失败时返回 false 由
  * 调用方退回全新 id）。
@@ -10,7 +10,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { rm } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
-import { SessionId, type SessionHeader } from '@deepseek-ai/dsh-session'
+import { SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import {
   clearEmptySessionArtifact,
   findMostRecentEmptySession,
@@ -31,24 +31,33 @@ beforeEach(() => {
   rmMock.mockResolvedValue(undefined)
 })
 
-function userMessage(seq: number): { seq: number; time: number; type: string; data: unknown } {
+function userMessage(seq: number): SessionEvent {
   return {
     seq,
     time: seq,
     type: 'user/message',
     data: { id: `m-${seq}`, role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '你好' }] },
-  }
+  } as unknown as SessionEvent
 }
 
 function header(id: string, createdAt: number, cwd?: string): SessionHeader {
-  return { id: SessionId(id), version: 0, createdAt, isSeeded: false, ...(cwd === undefined ? {} : { cwd }) }
+  return { id: SessionId(id), version: 3, createdAt, isSeeded: false, ...(cwd === undefined ? {} : { cwd }) }
 }
 
 interface FakePersistence {
+  /** 0.1.5 契约：快照包装（{header}）列表。 */
   list: ReturnType<typeof vi.fn>
-  /** 复用扫描用的 detached 物理读（无则跳过候选——inspect 会污染身份）。 */
-  readFrom?: ReturnType<typeof vi.fn>
+  /** 复用扫描用的 detached 读句柄（无则跳过候选——live 挂载会污染身份）。 */
+  open?: ReturnType<typeof vi.fn>
   locate?: ReturnType<typeof vi.fn>
+}
+
+/** 0.1.5 读句柄 mock：read(offset) 按会话 id 给事件，close 幂等。 */
+function readHandle(eventsFor: (id: SessionId) => SessionEvent[]): ReturnType<typeof vi.fn> {
+  return vi.fn(async (id: SessionId) => ({
+    read: vi.fn(async () => ({ events: eventsFor(id) })),
+    close: vi.fn(async () => { }),
+  }))
 }
 
 function makeCtx(persistence?: FakePersistence): Context {
@@ -83,17 +92,17 @@ describe('findMostRecentEmptySession', () => {
         header('session-newest', 30, '/a'),
         header('session-empty', 20, '/a'),
         header('session-old-content', 10, '/a'),
-      ]),
-      readFrom: vi.fn(async (id: SessionId) => {
-        if (id === 'session-newest') return { events: [userMessage(1)] }
-        if (id === 'session-empty') return { events: [] }
-        return { events: [userMessage(1)] }
+      ].map(h => ({ header: h }))),
+      open: readHandle((id) => {
+        if (id === 'session-newest') return [userMessage(1)]
+        if (id === 'session-empty') return []
+        return [userMessage(1)]
       }),
     }
     const ctx = makeCtx(persistence)
     const found = await findMostRecentEmptySession(ctx)
     expect(found?.id).toBe('session-empty')
-    expect(persistence.readFrom).toHaveBeenCalledTimes(2) // 到第一个空会话即停
+    expect(persistence.open).toHaveBeenCalledTimes(2) // 到第一个空会话即停
   })
 
   it('最新的空会话被最新非空会话挡住时仍能找到更早的空会话', async () => {
@@ -101,10 +110,10 @@ describe('findMostRecentEmptySession', () => {
       list: vi.fn(async () => [
         header('session-busy', 30, '/a'),
         header('session-empty', 20, '/a'),
-      ]),
-      readFrom: vi.fn(async (id: SessionId) => {
-        if (id === 'session-busy') return { events: [userMessage(1)] }
-        return { events: [] }
+      ].map(h => ({ header: h }))),
+      open: readHandle((id) => {
+        if (id === 'session-busy') return [userMessage(1)]
+        return []
       }),
     }
     const found = await findMostRecentEmptySession(makeCtx(persistence))
@@ -113,17 +122,17 @@ describe('findMostRecentEmptySession', () => {
 
   it('读取失败（corrupt）的会话跳过，不误判为无内容', async () => {
     const persistence = {
-      list: vi.fn(async () => [header('session-corrupt', 30, '/a'), header('session-empty', 20, '/a')]),
-      readFrom: vi.fn(async (id: SessionId) => {
+      list: vi.fn(async () => [header('session-corrupt', 30, '/a'), header('session-empty', 20, '/a')].map(h => ({ header: h }))),
+      open: vi.fn(async (id: SessionId) => {
         if (id === 'session-corrupt') throw new Error('corrupt artifact')
-        return { events: [] }
+        return { read: vi.fn(async () => ({ events: [] })), close: vi.fn(async () => { }) }
       }),
     }
     const found = await findMostRecentEmptySession(makeCtx(persistence))
     expect(found?.id).toBe('session-empty')
   })
 
-  it('后端无 readFrom（detached 读）→ 候选跳过（inspect 会污染身份，不冒险）', async () => {
+  it('后端无 open（detached 读）→ 候选跳过（live 挂载会污染身份，不冒险）', async () => {
     const persistence = {
       list: vi.fn(async () => [header('session-empty', 20, '/a')]),
     }
@@ -139,17 +148,17 @@ describe('findMostRecentEmptySession', () => {
     expect(await findMostRecentEmptySession(makeCtx())).toBeUndefined() // 无 persistence → live store 空
   })
 
-  it('只扫描最近 REUSE_SCAN_LIMIT 个会话（更早的空会话不触发全量 readFrom）', async () => {
+  it('只扫描最近 REUSE_SCAN_LIMIT 个会话（更早的空会话不触发全量读取）', async () => {
     const headers = Array.from({ length: REUSE_SCAN_LIMIT + 1 }, (_, i) =>
       header(`session-recent-${i}`, 100 - i, '/a'))
     headers.push(header('session-old-empty', 1, '/a'))
     const persistence = {
-      list: vi.fn(async () => headers),
-      readFrom: vi.fn(async () => ({ events: [userMessage(1)] })), // 最近 N 个全有内容
+      list: vi.fn(async () => headers.map(h => ({ header: h }))),
+      open: readHandle(() => [userMessage(1)]), // 最近 N 个全有内容
     }
     const found = await findMostRecentEmptySession(makeCtx(persistence))
     expect(found).toBeUndefined()
-    expect(persistence.readFrom).toHaveBeenCalledTimes(REUSE_SCAN_LIMIT)
+    expect(persistence.open).toHaveBeenCalledTimes(REUSE_SCAN_LIMIT)
   })
 })
 

@@ -3,6 +3,23 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
+## [0.1.2-rc.30] - 2026-09-12
+
+宿主线上到 0.1.5（官方 `latest` 已于 09-11 切到 0.1.5-rc.1，#57 同期）。
+
+### 宿主 0.1.5 线适配
+
+- **依赖钉线** — 52 个 `@deepseek-ai/dsh-*` peer `^0.1.5-rc.1` / dev `^0.1.5-rc.2`（`dsh-agent-presets` 精确钉同步；spine demo 夹具仍钉 alpha.2）；新增 `dsh-http-proxy`（dsh-subprocess rc.2 直连依赖）
+- **流式事件改批** — `assistant/chunk` 逐 delta 事件被移除，改 `assistant/attempt` 批量事件：transcript 折叠 / btw 答案收集 / live 流式三处经官方 `expandAssistantStream` 展开，语义不变；btw 面板对即时完成（无增量事件）的回合回退读 `assistant/message` 正文
+- **sessionPersistence 契约适配** — `list()` 返回 `{header,…}` 快照（不再是裸 header），`inspect`/`readFrom` 被 `open(id,'read')` + `handle.read()` 取代：适配层在 seam 内翻译，消费方零改动；`locate` 透传
+- **真机防御** — 跨格式混合库中 `createdAt` 缺失的行不再让 `/session list` 崩 `Invalid time value`、欢迎页不再渲染 `NaN-NaN-NaN`（渲染「未知时间」）
+- **组合测试** — llm-replay 夹具升 v3 格式（session header 必填、attempt 事件、空文件拒绝）；组合 spec 补 `dsh-http-proxy` 模块
+- **e2e 加固** — artifact 匹配 `session*.jsonl.zstd`；注入占位 key 防 0.1.5 key-flow 弹窗吞键入
+
+### 真机验证
+
+vendor/dev 宿主 0.1.5-rc.2：pty e2e 全绿（启动、v3 zstd 持久化、/session list、16 会话、选择器、同目录重启复用、跨目录 artifact 清理）；typecheck 0；root 2716/2716 + vision-ask 32/32（`--no-file-parallelism`）。
+
 ## [0.1.2-rc.29] - 2026-09-09
 
 欢迎页三模式 + 宿主线 0.1.2-rc.1 适配。

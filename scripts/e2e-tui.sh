@@ -39,6 +39,9 @@ cp "$ROOT/.dsh-dev/profiles/tui/package.json" "$E2E_HOME/profiles/tui/"
 [ -f "$ROOT/.dsh-dev/profiles/tui/pnpm-workspace.yaml" ] && cp "$ROOT/.dsh-dev/profiles/tui/pnpm-workspace.yaml" "$E2E_HOME/profiles/tui/"
 ln -s "$ROOT/.dsh-dev/profiles/tui/node_modules" "$E2E_HOME/profiles/tui/node_modules"
 
+# 0.1.5 起 key-flow 会在缺 key 时自动弹设置框吞掉后续键入——注入占位 key
+# 让弹窗不弹（被测的会话管理流程不需要真 key；进程环境同名变量优先）。
+export DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-e2e-placeholder-key}"
 export DSH_HOME="$E2E_HOME"
 export DSH_TUI_SKIP_UPDATE=1
 export E2E_CLI="$CLI"

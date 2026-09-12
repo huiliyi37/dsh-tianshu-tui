@@ -33,7 +33,7 @@
 
 ## 安装
 
-本包不是独立程序。须先有官方 CLI [`@deepseek-ai/dsh`](https://www.npmjs.com/package/@deepseek-ai/dsh)（npm `latest`，当前 `0.1.2-rc.1`；需 ≥ `0.1.2-rc.1`，peer 依赖对齐）。只 `npm i` 本包跑不起来。
+本包不是独立程序。须先有官方 CLI [`@deepseek-ai/dsh`](https://www.npmjs.com/package/@deepseek-ai/dsh)（npm `latest`，当前 `0.1.5-rc.1`；需 ≥ `0.1.5-rc.1`，peer 依赖对齐）。只 `npm i` 本包跑不起来。
 
 **一键安装（推荐）**：仓库自带跨平台脚本，自动检测 Node/pnpm、经 pnpm 安装官方 CLI + 装配本插件并启动（国内网络默认走 npmmirror 镜像）：
 
@@ -82,7 +82,7 @@ pnpm dlx @deepseek-ai/dsh --profile tui
 
 ### 4. agent 预设（`/preset`）
 
-命令是 `/preset`（没有 `/presets`）。本包 bundle 对标官方 web：关掉 host 上的 agent 面，挂上 `@deepseek-ai/dsh-agent-presets`（依赖钉死 `0.1.2-rc.1`，npm `latest` 仍停在过时的 `0.0.1-rc.1`）。`plugin add` 本包即连带装上花名册；新会话在 `setup` 里 `mount`，`/preset` 换的是官方 shipped 面（标准 / PTC / 极简 / 创造），不是叠在 `dsh-base` 工具上。
+命令是 `/preset`（没有 `/presets`）。本包 bundle 对标官方 web：关掉 host 上的 agent 面，挂上 `@deepseek-ai/dsh-agent-presets`（依赖钉死 `0.1.5-rc.1`，npm `latest` 仍停在过时的 `0.0.1-rc.1`）。`plugin add` 本包即连带装上花名册；新会话在 `setup` 里 `mount`，`/preset` 换的是官方 shipped 面（标准 / PTC / 极简 / 创造），不是叠在 `dsh-base` 工具上。
 
 用法：
 
@@ -122,7 +122,9 @@ settings 各自独立）。共存时 tianshu 侧设 `export DSH_HOME=~/.dsh-tian
 
 ## 更新说明
 
-当前 npm `latest`：[`@huiliyi37/dsh-tianshu-tui@0.1.2-rc.29`](https://www.npmjs.com/package/@huiliyi37/dsh-tianshu-tui)（[GitHub Release](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v0.1.2-rc.29)）。
+当前 npm `latest`：[`@huiliyi37/dsh-tianshu-tui@0.1.2-rc.30`](https://www.npmjs.com/package/@huiliyi37/dsh-tianshu-tui)（[GitHub Release](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v0.1.2-rc.30)）。
+
+**0.1.2-rc.30（2026-09-12）**：宿主线上到 0.1.5（官方 `latest` 已切 0.1.5-rc.1）——流式事件 `assistant/chunk`→`assistant/attempt` 批量改批、sessionPersistence 新契约（快照列表 + open/read 句柄）、遗留库时间渲染防御；真机 pty e2e 全绿。⚠ 需宿主 ≥ 0.1.5-rc.1。
 
 **0.1.2-rc.29（2026-09-09）**：宿主线上到 0.1.2-rc.1（官方 `latest` 已转正，修复 #56 启动即崩）——`Session.events` 移除改 `snapshotEvents()`、userQuestions 改 waterfall answerer（global 注册）、`CallId→ToolCallId`、preset `code→ptc`、fork 血缘改 `isSeeded`+`inheritedEventCount`、bundle patch 补 `subagent-model-selection-settings`；旧宿主（≤0.1.1-rc.2）启动即 fail-loud 附升级/回退指引。⚠ 本次升级需宿主 ≥ 0.1.2-rc.1。
 
@@ -132,7 +134,6 @@ settings 各自独立）。共存时 tianshu 侧设 `export DSH_HOME=~/.dsh-tian
 
 **0.1.2-rc.26（2026-08-28）**：P1 交互打磨六连——Esc 分层收尾（打断 grace 期 + 布防提示行）、glance 拟人动词池、footer 显式分级降级、错误恢复指引（每个错误附下一步操作）、定高视口强化（chrome 开合输入轨不跳）、fish 式历史建议 ghost（`→` 接受）；`/scroll` 上限可配。
 
-**0.1.2-rc.25（2026-08-28）**：P0 交互三连——键位/命令/提示统一 action registry（app.ts 棘轮 4359→4140）、审批卡六档决策梯度（新增 `p` 命令前缀白名单、`f` 拒绝附反馈，bash 审批带命令预览与危险标注）、运行中消息排队（`↑` 收回、`Ctrl+Enter` 插队、打断保队列）；另含 `/scroll` 分页查看器、完成响铃、vim remap、主题对比度校验。
 
 
 **0.1.2-rc.23（2026-08-27）**：LSP 三件套对齐 tianshu-public 0.6.0 官方 seam 线（单 `lsp` 工具四操作 + 本地 provider 默认 tsserver），诊断源能力门控防 `/lsp` 面板退化；宿主 peer 对齐 `^0.1.1-rc.2`。

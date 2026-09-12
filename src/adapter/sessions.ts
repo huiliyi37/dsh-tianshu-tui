@@ -41,13 +41,52 @@ interface SessionPersistenceFacet {
   locate?(meta: SessionHeader): { path: string } | undefined
 }
 
-/** 经注入代理读取可选的 sessionPersistence 服务（未装配返回 undefined）。 */
+/** 经注入代理读取可选的 sessionPersistence 服务（未装配返回 undefined）。
+ *
+ * 0.1.5 契约重设计：list() 返回 `{header,…}` 快照（不再是裸 header）；
+ * inspect/readFrom 被 `open(id, access)` + `handle.read()` 取代。此处把
+ * 原始服务翻译成仓内 seam，消费方代码对宿主线无感。
+ */
 function persistenceFacet(ctx: Context): SessionPersistenceFacet | undefined {
-  return (
+  const raw = (
     ctx.reflect !== undefined
       ? ctx.reflect.get('sessionPersistence', false)
       : ctx.get('sessionPersistence')
-  ) as SessionPersistenceFacet | undefined
+  ) as
+    | {
+        list(options?: { signal?: AbortSignal }): Promise<readonly unknown[]>
+        open(id: SessionId, access: 'read' | 'write', options?: { signal?: AbortSignal }): Promise<{
+          read(offset?: number): Promise<{ events: readonly SessionEvent[] }>
+          close(): Promise<void>
+        }>
+        /** 后端独立 artifact 定位（JSONL 后端实现；0.1.5 契约未声明，可选透传）。 */
+        locate?(meta: SessionHeader): { path: string } | undefined
+      }
+    | undefined
+  if (raw === undefined) return undefined
+  const openReadEvents = async (id: SessionId, fromSeq?: number): Promise<readonly SessionEvent[]> => {
+    const handle = await raw.open(id, 'read')
+    try {
+      return (await handle.read(fromSeq)).events
+    } finally {
+      await handle.close().catch(() => { /* 只读句柄关闭失败可安全忽略 */ })
+    }
+  }
+  return {
+    // 后端独有能力（locate 等）原样透传（绑定原服务实例）
+    ...(raw.locate !== undefined ? { locate: (meta: SessionHeader) => raw.locate!(meta) } : {}),
+    list: async () => {
+      const snapshots = await raw.list()
+      return snapshots.map((item) => {
+        if (item !== null && typeof item === 'object' && 'header' in item) {
+          return (item as { header: SessionHeader }).header
+        }
+        return item as SessionHeader
+      })
+    },
+    inspect: async (id) => ({ events: await openReadEvents(id) }),
+    readFrom: async (id, fromSeq) => ({ events: await openReadEvents(id, fromSeq) }),
+  }
 }
 
 /** One session row for the TUI session list. */

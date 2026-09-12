@@ -32,12 +32,13 @@ function toolResult(seq: number, callId: string, error?: { name: string; code: s
       turn,
       step: 0,
       message: {
+        role: 'user',
         source: { kind: 'tool', callId: callId as ToolCallId },
         content: [{ type: 'tool-result', toolCallId: callId, content: [] }],
       },
       ...(error === undefined ? {} : { error }),
     },
-  } as SessionEvent
+  } as unknown as SessionEvent
 }
 
 describe('emptyTurnSummary', () => {
@@ -123,7 +124,7 @@ describe('applyTurnEvent — tool/result pairing', () => {
     summary = applyTurnEvent(summary, toolCall(2, 'c1', 'bash', 1, 0))
     const unchanged = applyTurnEvent(
       summary,
-      { seq: 5, time: 1005, type: 'assistant/message', data: { content: [] } } as SessionEvent,
+      { seq: 5, time: 1005, type: 'assistant/message', data: { turn: 1, step: 0, message: { role: 'assistant', content: [] } } } as unknown as SessionEvent,
     )
     expect(unchanged).toBe(summary)
   })

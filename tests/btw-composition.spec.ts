@@ -100,7 +100,7 @@ interface Booted {
  * Boot 真实 TUI 装配（agent-spine 提供 agents.create factory；llm-replay 录制
  * 一条 btw 回答）。主会话 attach 不调模型，btw 会话是第一个调用者 → 拿脚本。
  */
-async function boot(): Promise<Booted> {
+export async function boot(): Promise<Booted> {
   root = await mkdtemp(join(tmpdir(), 'dsh-tui-btw-'))
   vi.stubEnv('DSH_HOME', join(root, '.dsh'))
   vi.stubEnv('DSH_AGENTS_HOME', join(root, '.agents'))
@@ -108,12 +108,17 @@ async function boot(): Promise<Booted> {
   const stdin = makeStdin()
 
   // llm-replay 脚本：一条模型调用（btw 回答流）。text-delta 即答案文本，
-  // finish 结尾（deriveReplayScript 要求完整流）。
+  // finish 结尾（deriveReplayScript 要求完整流；0.1.5 起从 assistant/attempt 推导）。
   const fixturePath = join(root, 'session.jsonl')
   await writeFile(fixturePath, [
-    JSON.stringify({ type: 'session', version: 0, id: 'btw-s1', createdAt: 0 }),
-    JSON.stringify({ type: 'assistant/chunk', seq: 0, time: 0, data: { turn: 1, step: 1, chunk: { type: 'text-delta', text: 'O(n log n) —— 基于分治。' } } }),
-    JSON.stringify({ type: 'assistant/chunk', seq: 1, time: 0, data: { turn: 1, step: 1, chunk: { type: 'finish', reason: { kind: 'stop' } } } }),
+    JSON.stringify({ type: 'session', version: 3, id: 'btw-s1', createdAt: 0, isSeeded: false, delegationDepth: 0 }),
+    // attempt 前须有打开的 turn/step（v3 校验事件次序）
+    JSON.stringify({ type: 'turn/start', seq: 0, time: 0, data: { turn: 1 } }),
+    JSON.stringify({ type: 'step/start', seq: 1, time: 0, data: { turn: 1, step: 1 } }),
+    JSON.stringify({ type: 'assistant/attempt', seq: 2, time: 0, data: { turn: 1, step: 1, stream: [
+      { type: 'chunk', time: 0, chunk: { type: 'text-delta', index: 0, text: 'O(n log n) —— 基于分治。' } },
+      { type: 'chunk', time: 0, chunk: { type: 'finish', reason: { kind: 'stop' } } },
+    ] } }),
   ].join('\n') + '\n')
 
   const configPath = join(root, 'cordis.yml')

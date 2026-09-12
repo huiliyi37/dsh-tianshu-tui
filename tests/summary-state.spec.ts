@@ -28,12 +28,13 @@ function toolResult(seq: number, callId: string, turn: number, step: number, err
       turn,
       step,
       message: {
+        role: 'user',
         source: { kind: 'tool', callId: callId as ToolCallId },
         content: [{ type: 'tool-result', toolCallId: callId, content: [] }],
       },
       ...(error === undefined ? {} : { error }),
     },
-  } as SessionEvent
+  } as unknown as SessionEvent
 }
 
 function turnStart(seq: number, turn: number): SessionEvent {

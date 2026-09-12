@@ -131,6 +131,9 @@ pass "phase1: TUI 启动（cwd=$new）"
 # 命令可能抢跑看到「当前无会话」）。
 proc list_echo_expect {pat} {
   for {set i 0} {$i < 30} {incr i} {
+    # 0.1.5 attach 变慢：就绪前键入的字符会被丢弃/残留——每次重试先 Ctrl+U 清输入行
+    send "\x15"
+    after 100
     send "/session list\r"
     set got 0
     expect {

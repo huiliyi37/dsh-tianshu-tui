@@ -84,7 +84,7 @@ describe('published bundle contract', () => {
     expect(patch).toContain('id: agent-presets')
     expect(patch).toContain('@deepseek-ai/dsh-agent-presets')
     expect(patch).toMatch(/id:\s*tool-bash[\s\S]*disabled:\s*true/)
-    expect(pkg.dependencies?.['@deepseek-ai/dsh-agent-presets']).toBe('0.1.2-rc.1')
+    expect(pkg.dependencies?.['@deepseek-ai/dsh-agent-presets']).toBe('0.1.5-rc.1')
   })
 
   it('官方预设包可解析时（无则跳过）不声明自己的 bundle.patch', async () => {

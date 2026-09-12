@@ -87,11 +87,11 @@ describe('completedTurnSeed', () => {
     const events = [
       event(0, 'user/message'),
       event(1, 'turn/start'),
-      event(2, 'assistant/chunk', { chunk: { type: 'text-delta', text: 'a' } }),
+      event(2, 'assistant/attempt', { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: 'a' } }] }),
       event(3, 'turn/end', { reason: { kind: 'stop' } }),
       event(4, 'user/message'),
       event(5, 'turn/start'),
-      event(6, 'assistant/chunk', { chunk: { type: 'text-delta', text: 'b' } }),
+      event(6, 'assistant/attempt', { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: 'b' } }] }),
     ]
     const seed = completedTurnSeed(events)
     expect(seed).toHaveLength(4)
@@ -230,8 +230,8 @@ describe('BtwController', () => {
     await controller.ask('q')
     const btwId = (ctx.agents.create.mock.calls[0]![0] as { sessionId: SessionId }).sessionId
 
-    emit(ACTIVE, event(0, 'assistant/chunk', { chunk: { type: 'text-delta', text: '答' } }))
-    emit(btwId, event(1, 'assistant/chunk', { chunk: { type: 'text-delta', text: '案' } }))
+    emit(ACTIVE, event(0, 'assistant/attempt', { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: '答' } }] }))
+    emit(btwId, event(1, 'assistant/attempt', { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: '案' } }] }))
     expect(controller.peek()?.status).toBe('loading')
     emit(btwId, event(2, 'turn/end', { reason: { kind: 'stop' } }))
 
@@ -247,7 +247,7 @@ describe('BtwController', () => {
     const controller = new BtwController({ ctx, activeSessionId: () => ACTIVE, timeoutMs: 1000 })
     await controller.ask('q')
     const btwId = (ctx.agents.create.mock.calls[0]![0] as { sessionId: SessionId }).sessionId
-    emit(ACTIVE, event(0, 'assistant/chunk', { chunk: { type: 'text-delta', text: '主会话' } }))
+    emit(ACTIVE, event(0, 'assistant/attempt', { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: '主会话' } }] }))
     emit(btwId, event(1, 'turn/end', { reason: { kind: 'stop' } }))
     expect(controller.peek()).toEqual({ status: 'done', question: 'q', answer: '' })
     controller.dispose()
@@ -259,7 +259,7 @@ describe('BtwController', () => {
     const controller = new BtwController({ ctx, activeSessionId: () => ACTIVE, onAnswer, timeoutMs: 1000 })
     await controller.ask('q')
     const btwId = (ctx.agents.create.mock.calls[0]![0] as { sessionId: SessionId }).sessionId
-    emit(btwId, event(0, 'assistant/chunk', { chunk: { type: 'text-delta', text: '答案' } }))
+    emit(btwId, event(0, 'assistant/attempt', { turn: 1, step: 0, stream: [{ type: 'chunk', time: 1, chunk: { type: 'text-delta', text: '答案' } }] }))
     emit(btwId, event(1, 'turn/end', { reason: { kind: 'stop' } }))
 
     controller.dismiss()

@@ -38,6 +38,7 @@ import type { ReadStream, WriteStream } from 'node:tty'
 import type { Context, Events } from '@deepseek-ai/cordis'
 import { Session, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ToolCallId, TokenUsage } from '@deepseek-ai/dsh-llm'
+import { expandAssistantStream } from '@deepseek-ai/dsh-llm'
 import { installModelSelection, type Agent, type AgentHandle, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 // 空类型导入引入 Context 上 agentDefaultModel 服务的声明合并（headless 同款）。
 import type {} from '@deepseek-ai/dsh-agent-default-model'
@@ -3347,17 +3348,19 @@ export class TuiApp {
     this.turnSummary = applyTurnEvent(this.turnSummary, event)
     this.sessionSummary = applySummaryEvent(this.sessionSummary, event)
     switch (event.type) {
-      case 'assistant/chunk': {
-        const { chunk } = event.data
-        if (chunk.type === 'text-delta') {
-          // 正文开始即推理段结束点：先整块落底（此刻 blockWriter 必为空——
-          // 推理段先于本 step 一切 text-delta，顺序天然安全）。
-          this.commitReasoningBlock()
-          this.blockWriter.push(chunk.text)
-        } else if (chunk.type === 'reasoning-delta') {
-          if (this.reasoningText === '') this.reasoningStartedAt = event.time
-          this.reasoningText += chunk.text
-          this.renderBatcher.schedule()
+      case 'assistant/attempt': {
+        // 0.1.5：text/reasoning delta 批量打包进 attempt（压缩流记录展开）
+        for (const { time: chunkTime, chunk } of expandAssistantStream(event.data.stream)) {
+          if (chunk.type === 'text-delta') {
+            // 正文开始即推理段结束点：先整块落底（此刻 blockWriter 必为空——
+            // 推理段先于本 step 一切 text-delta，顺序天然安全）。
+            this.commitReasoningBlock()
+            this.blockWriter.push(chunk.text)
+          } else if (chunk.type === 'reasoning-delta') {
+            if (this.reasoningText === '') this.reasoningStartedAt = chunkTime
+            this.reasoningText += chunk.text
+            this.renderBatcher.schedule()
+          }
         }
         break
       }
