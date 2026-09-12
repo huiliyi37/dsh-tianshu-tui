@@ -60,6 +60,9 @@ const DAY_MS = 86_400_000
  * @returns 相对时间文本（≥7 天为 `YYYY-MM-DD`）。
  */
 export function formatSessionAge(createdAt: number, now: number): string {
+  // 宿主升级跨存储格式（如 0.1.5 起 v3/zstd）后，遗留会话目录可能列出
+  // createdAt 缺失的摘要——渲染「未知时间」，绝不输出 NaN-NaN-NaN。
+  if (!Number.isFinite(createdAt)) return '未知时间'
   const diff = now - createdAt
   if (diff < 60_000) return '刚刚'
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
@@ -225,8 +228,19 @@ export function formatSessionListLines(
   for (const bucket of groupSessionsByAge(rows, now)) {
     out.push(`${bucket.label} · ${bucket.items.length}`)
     for (const row of bucket.items) {
-      out.push(`${row.id} · ${row.title} · ${new Date(row.createdAt).toISOString()}`)
+      out.push(`${row.id} · ${row.title} · ${isoTimeOrUnknown(row.createdAt)}`)
     }
   }
   return out
+}
+
+/**
+ * ISO 时间或「未知时间」。宿主升级跨存储格式（0.1.5 起 v3/zstd）后，遗留
+ * 会话目录可能列出 createdAt 缺失的行——无效值绝不让整条 /session list
+ * 崩在 `toISOString()` 的 RangeError 上（真机 0.1.5 实测）。
+ */
+function isoTimeOrUnknown(createdAt: number): string {
+  if (!Number.isFinite(createdAt)) return '未知时间'
+  const d = new Date(createdAt)
+  return Number.isFinite(d.getTime()) ? d.toISOString() : '未知时间'
 }

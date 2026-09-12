@@ -279,4 +279,14 @@ describe('formatSessionListLines', () => {
     expect(lines[0]).toBe('今天 · 1')
     expect(lines[1]).toBe(`session-red-1 · 评估准确率 · ${new Date(created).toISOString()}`)
   })
+
+  it('createdAt 无效（宿主跨存储格式遗留行）→ 行渲染「未知时间」，不炸整条命令', () => {
+    const lines = formatSessionListLines(
+      [{ id: 'session-bad-1', createdAt: Number.NaN, title: '新对话' }],
+      NOW,
+    )
+    expect(lines[0]).toBe('更早 · 1')
+    expect(lines[1]).toBe('session-bad-1 · 新对话 · 未知时间')
+    expect(formatSessionAge(Number.NaN, NOW)).toBe('未知时间')
+  })
 })

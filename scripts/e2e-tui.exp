@@ -98,7 +98,8 @@ quit_tui
 pass "phase0: 已退出"
 
 # 从 store 发现空会话与存储根（fresh home 首启由后端创建）
-if {[catch {set found [exec sh -c "find '$home' -name 'session.jsonl.zstd' -print -quit"]} e]} {
+# 0.1.2 线为 session.jsonl.zstd；0.1.5 起 v3 格式改名 session.v3.jsonl.zstd
+if {[catch {set found [exec sh -c "find '$home' -name 'session*.jsonl.zstd' -print -quit"]} e]} {
   fail "phase0: 未发现 session artifact（$e）"
 }
 set found [string trim $found]
