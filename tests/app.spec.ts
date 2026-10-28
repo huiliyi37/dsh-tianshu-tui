@@ -3550,7 +3550,7 @@ describe('TuiApp 投影层接线（turn-summary 摘要行 + /status 会话段）
     bus(id, { seq: 3, time: 1200, type: 'tool/result', data: { turn: 1, step: 0, message: { id: 'm-c1', role: 'tool', source: { kind: 'tool', callId: 'c1' }, toolCallId: 'c1', content: [{ type: 'text', text: 'ok' }] } } })
     bus(id, { seq: 4, time: 1300, type: 'tool/call', data: { callId: 'c2', name: 'edit_file', arguments: '{}', turn: 1, step: 1 } })
     bus(id, { seq: 5, time: 2300, type: 'tool/result', data: { turn: 1, step: 1, message: { id: 'm-c2', role: 'tool', source: { kind: 'tool', callId: 'c2' }, toolCallId: 'c2', content: [{ type: 'text', text: 'done' }] } } })
-    bus(id, { seq: 6, time: 2400, type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
+    bus(id, { seq: 6, time: 3600, type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } })
   }
 
   it('turn/end（completed）且有工具调用 → 提交 turn 摘要行（读/改计数复用 tool-meta 家族）', async () => {
@@ -3567,6 +3567,7 @@ describe('TuiApp 投影层接线（turn-summary 摘要行 + /status 会话段）
     const written = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
     expect(written).toContain('turn 1')
     expect(written).toContain('读1 改1')
+    expect(written).toContain('2s')
     await app.dispose()
   })
 

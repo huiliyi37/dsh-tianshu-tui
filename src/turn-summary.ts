@@ -28,6 +28,10 @@ export interface TurnSummaryState {
   failedCount: number
   totalElapsedMs: number
   byFamily: Record<ToolFamily, number>
+  /** turn/start 的 epoch 毫秒；完整回合墙钟计时起点。 */
+  startedAt?: number
+  /** turn/end - turn/start 的完整回合墙钟耗时（含思考、模型响应与工具）。 */
+  wallElapsedMs?: number
 }
 
 const EMPTY_FAMILY = (): Record<ToolFamily, number> => ({ file: 0, shell: 0, search: 0, edit: 0, network: 0, other: 0 })
@@ -43,7 +47,7 @@ export function emptyTurnSummary(turn: number): TurnSummaryState {
 
 /**
  * 折叠 SessionEvent：tool/call 计数 + 家族分类；tool/result 计时 + 失败计数。
- * turn/start 重置为该轮的空统计；未配对的 tool/result 与其余事件不改变状态。
+ * turn/start 重置为该轮的空统计并记录起点；turn/end 定格完整回合墙钟耗时。
  * @param state - 当前统计状态。
  * @param event - 会话事件。
  * @returns 新统计状态。
@@ -77,7 +81,10 @@ export function applyTurnEvent(state: TurnSummaryState, event: SessionEvent): Tu
       }
     }
     case 'turn/start':
-      return emptyTurnSummary(event.data.turn)
+      return { ...emptyTurnSummary(event.data.turn), startedAt: event.time }
+    case 'turn/end':
+      if (state.startedAt === undefined) return state
+      return { ...state, wallElapsedMs: Math.max(0, event.time - state.startedAt) }
     default:
       return state
   }
@@ -112,6 +119,7 @@ export function summarizeTurn(turn: number, events: readonly SessionEvent[]): Tu
   let state = emptyTurnSummary(turn)
   for (const event of events) {
     if (event.type === 'turn/start' && event.data.turn !== turn) continue
+    if (event.type === 'turn/end' && event.data.turn !== turn) continue
     if (event.type === 'tool/call' && event.data.turn !== turn) continue
     if (event.type === 'tool/result' && event.data.turn !== turn) continue
     state = applyTurnEvent(state, event)

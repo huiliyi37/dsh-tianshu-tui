@@ -780,8 +780,8 @@ export declare class TuiApp {
     private flushStream;
     /**
      * turn 结束摘要行（投影层：turn-summary 模型 → format/turn-summary 渲染半）：
-     * `turn N · 读X 改Y · elapsed` 单行 dim 落 scrollback。读/改计数复用
-     * tool-meta 的 read|find/write 家族（投影不重复造「工具名 → 域」映射）。
+     * `turn N · 读X 改Y · elapsed` 单行 dim 落 scrollback。elapsed 是完整回合
+     * 墙钟耗时（含思考与模型响应）；中途挂载错过 turn/start 时回退工具耗时合计。
      * @param summary - 该 turn 的统计快照（fold 于 handleStreamEvent，调用点取定）。
      * @param turn - 轮号（取 turn/end 事件的权威值；中途挂载错过 turn/start 时
      *   快照内轮号是初值 0）。

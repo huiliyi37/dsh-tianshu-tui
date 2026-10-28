@@ -199,7 +199,7 @@ pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-t
 | `/model [target] [effort]` | 查看/切换模型（别名：`spark-flash`、`spark-pro`） |
 | `/effort off\|high\|max\|auto` | 设置推理等级（热切） |
 | `/theme [name]` | 切换主题 |
-| `/density` | 切换紧凑工具卡渲染 |
+| `/density` | 切换紧凑渲染（工具输出与思考仅保留标题/摘要；`default` 写入启动默认） |
 | `/vim [on\|off\|default]` | 切换 vi/vim 编辑键位；`default` 写入启动默认 |
 | `/lsp` | 切换 LSP 诊断面板（agent 触碰文件时自动拉取该文件诊断；诊断徽标上工具卡） |
 | `lsp_goto_definition` · `lsp_find_references` · `lsp_diagnostics` | LSP 模型工具面（伴生插件 `lsp/` 注册；定义跳转 / 引用查找 / 文件诊断） |

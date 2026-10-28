@@ -26,6 +26,10 @@ export interface TurnSummaryState {
     failedCount: number;
     totalElapsedMs: number;
     byFamily: Record<ToolFamily, number>;
+    /** turn/start 的 epoch 毫秒；完整回合墙钟计时起点。 */
+    startedAt?: number;
+    /** turn/end - turn/start 的完整回合墙钟耗时（含思考、模型响应与工具）。 */
+    wallElapsedMs?: number;
 }
 /**
  * 空轮级统计（全零计数）。
@@ -35,7 +39,7 @@ export interface TurnSummaryState {
 export declare function emptyTurnSummary(turn: number): TurnSummaryState;
 /**
  * 折叠 SessionEvent：tool/call 计数 + 家族分类；tool/result 计时 + 失败计数。
- * turn/start 重置为该轮的空统计；未配对的 tool/result 与其余事件不改变状态。
+ * turn/start 重置为该轮的空统计并记录起点；turn/end 定格完整回合墙钟耗时。
  * @param state - 当前统计状态。
  * @param event - 会话事件。
  * @returns 新统计状态。

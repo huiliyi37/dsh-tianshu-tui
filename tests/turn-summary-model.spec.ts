@@ -140,6 +140,22 @@ describe('applyTurnEvent — turn boundary', () => {
     expect(summary.turn).toBe(2)
     expect(summary.toolCount).toBe(0)
     expect(summary.calls).toEqual([])
+    expect(summary.startedAt).toBe(1010)
+  })
+
+  it('records the full turn wall time separately from tool elapsed time', () => {
+    let summary = emptyTurnSummary(1)
+    summary = applyTurnEvent(summary, turnStart(1, 1))
+    summary = applyTurnEvent(summary, toolCall(2, 'c1', 'bash', 1, 0))
+    summary = applyTurnEvent(summary, toolResult(12, 'c1'))
+    summary = applyTurnEvent(summary, {
+      seq: SessionSeq(100),
+      time: 60_100,
+      type: 'turn/end',
+      data: { turn: 1, reason: { kind: 'completed' } },
+    })
+    expect(summary.totalElapsedMs).toBe(10)
+    expect(summary.wallElapsedMs).toBe(59_099)
   })
 })
 
@@ -173,6 +189,16 @@ describe('summarizeTurn', () => {
     expect(summary.turn).toBe(1)
     expect(summary.toolCount).toBe(1)
     expect(summary.calls).toHaveLength(1)
+  })
+
+  it('skips turn/end events from other turns when computing wall time', () => {
+    const events: SessionEvent[] = [
+      turnStart(1, 1),
+      { seq: SessionSeq(5), time: 5000, type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
+      turnStart(10, 2),
+      { seq: SessionSeq(20), time: 20_000, type: 'turn/end', data: { turn: 2, reason: { kind: 'completed' } } },
+    ]
+    expect(summarizeTurn(1, events).wallElapsedMs).toBe(3999)
   })
 })
 

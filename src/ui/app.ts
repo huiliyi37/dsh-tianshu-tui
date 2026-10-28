@@ -1025,7 +1025,7 @@ export class TuiApp {
     this.slash.register({
       name: 'density',
       category: '配置',
-      description: '切换紧凑渲染（带参 default=设为启动默认）',
+      description: '切换紧凑渲染（工具输出与思考仅保留标题/摘要；default=设为启动默认）',
       argsHint: '[default]',
       run: ({ text, echo }) => {
         const { persist } = splitDefaultFlag(text)
@@ -3578,8 +3578,8 @@ export class TuiApp {
 
   /**
    * turn 结束摘要行（投影层：turn-summary 模型 → format/turn-summary 渲染半）：
-   * `turn N · 读X 改Y · elapsed` 单行 dim 落 scrollback。读/改计数复用
-   * tool-meta 的 read|find/write 家族（投影不重复造「工具名 → 域」映射）。
+   * `turn N · 读X 改Y · elapsed` 单行 dim 落 scrollback。elapsed 是完整回合
+   * 墙钟耗时（含思考与模型响应）；中途挂载错过 turn/start 时回退工具耗时合计。
    * @param summary - 该 turn 的统计快照（fold 于 handleStreamEvent，调用点取定）。
    * @param turn - 轮号（取 turn/end 事件的权威值；中途挂载错过 turn/start 时
    *   快照内轮号是初值 0）。
@@ -3590,12 +3590,13 @@ export class TuiApp {
       return family === 'read' || family === 'find'
     }).length
     const writes = summary.calls.filter(c => getToolFamily(c.name).family === 'write').length
+    const elapsedMs = summary.wallElapsedMs ?? summary.totalElapsedMs
     const lines = renderTurnSummaryLine({
       turnNumber: turn,
       segments: [],
       filesRead: reads,
       filesModified: writes,
-      ...(summary.totalElapsedMs > 0 ? { elapsedMs: summary.totalElapsedMs } : {}),
+      ...(elapsedMs > 0 ? { elapsedMs } : {}),
       width: this.stdout.columns,
     }, this.theme)
     for (const line of lines) this.commitToScrollback({ text: line, trailingNewline: true })

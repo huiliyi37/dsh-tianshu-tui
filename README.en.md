@@ -219,7 +219,7 @@ The terminal UI evolved from [Tianshu-Tui](https://github.com/huiliyi37/Tianshu-
 | `/model [target] [effort]` | View/switch model (aliases: `spark-flash`, `spark-pro`) |
 | `/effort off\|high\|max\|auto` | Set reasoning effort (hot-switched) |
 | `/theme [name]` | Switch theme |
-| `/density` | Toggle compact tool-card rendering |
+| `/density` | Toggle compact rendering (titles/summaries only for tool output and reasoning; `default` persists at startup) |
 | `/vim [on\|off\|default]` | Toggle vi/vim editing keybindings; `default` persists as startup default |
 | `/status` | Toggle the status panel (goal/todos/plan projections + session totals) |
 | `/config [notify [on\|off]]` | Toggle the settings panel (empty-input `n` notify, `d` density). No-arg opens/closes the panel |
