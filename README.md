@@ -39,7 +39,7 @@
 | Node.js | `^22.19 || >=24` |
 | 包管理器 | [`pnpm`](https://pnpm.io/installation)，可由 `corepack enable` 启用 |
 | DeepSeek Harness | `@deepseek-ai/dsh@0.2.1-rc.4`，即 npm `next` 通道 |
-| 本插件 | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.3` |
+| 本插件 | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.4` |
 
 > **请显式使用宿主 `@next`。** 不要用宿主 `@latest` 代替（当前为 `0.2.1-rc.2`，低于要求）；`@alpha` 的 `0.2.2-alpha.2` 存在已知 API 不兼容，暂不支持。本包也不是可独立运行的 CLI。
 
@@ -125,7 +125,7 @@ pnpm dlx @deepseek-ai/dsh@next --profile tui
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-当前版本：**[`1.0.0-rc.3`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.3)**，适配宿主 `0.2.1-rc.4`。版本历史见 [CHANGELOG.md](CHANGELOG.md)，TUI 内可输入 `/changelog` 查看。
+当前版本：**[`1.0.0-rc.4`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.4)**，适配宿主 `0.2.1-rc.4`。本版修复 [#61](https://github.com/huiliyi37/dsh-tianshu-tui/issues/61)：WSL/原生粘贴 API Key、供应商目录与账号入口，并新增自定义 pi-ai 端点、模型发现和已有路由编辑。版本历史见 [CHANGELOG.md](CHANGELOG.md)，TUI 内可输入 `/changelog` 查看。
 
 ## 文档
 

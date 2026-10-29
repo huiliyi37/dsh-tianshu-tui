@@ -1,7 +1,7 @@
 {
   "name": "@huiliyi37/dsh-tianshu-tui",
   "description": "dsh-tianshu-tui: an interactive terminal UI plugin for the official DeepSeek Harness — streaming markdown/tool cards, 16+ themes, slash commands, session tabs, LSP diagnostics, cost tracking, self-update (`dsh plugin --profile tui add @huiliyi37/dsh-tianshu-tui`)",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

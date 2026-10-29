@@ -3,6 +3,22 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
+## [1.0.0-rc.4] - 2026-10-29
+
+### Provider 接入与自定义端点（#61）
+
+- 修复 WSL2 下 `/key` 无法粘贴 API Key：Linux 剪贴板链增加 `powershell.exe` 回退；终端原生粘贴正确路由到 Key/Provider 对话框，并防止慢速读取乱序、跨窗口写入和字段焦点漂移。空剪贴板与图片误粘会在当前 overlay 直接提示。
+- 供应商目录仅归并确认过的 DeepSeek 官方别名，保留同名同 Key 的自定义路由；`deepseek-account` 按可用性显示只读登录状态，不再进入无效的 API Key 保存流程。catalog 本地模型列表不再冒充 Key 鉴权成功。
+- 新增自定义 pi-ai 供应商编辑器：支持 route、displayName、带端口 baseURL、三种 wire 协议、手输/发现模型，以及已有路由的 baseURL/models 编辑。保存携带 settings revision，按 settings → credentials 顺序提交，Key 失败可单独重试；settings 只保存 `apiKeyEnv`，不写明文密钥。
+- 完整处理目录读取失败、route 冲突、异步取消、继承模型编辑及 `models` / `modelOverrides` 互斥；保留 headers、compat 等未展示字段。
+
+### 文档与社区
+
+- 重排中英文 GitHub README，集中呈现核心体验、快速开始、版本兼容与常用操作。
+- 增加天枢 Harness 官网、上游项目和论坛入口及徽章。
+
+验证：typecheck；主仓 2806/2806、vision-ask 32/32；官方 rc.4 下原有 TUI expect E2E 全部通过；真实 rc.4 + 回环 HTTP 端点完成自定义供应商创建、模型发现、`/model` 选择及实际流式请求。
+
 ## [1.0.0-rc.3] - 2026-10-28
 
 ### 宿主 0.2.1-rc.4 兼容

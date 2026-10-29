@@ -2,7 +2,7 @@
 
 后续发版**只按本文**执行。历史筹备清单见 [PUBLISH-PLAN.md](PUBLISH-PLAN.md)（已过期，不要当步骤跑）。
 
-当前线上：`@huiliyi37/dsh-tianshu-tui@1.0.0-rc.3`（npm `latest`）。发版后更新此行。
+当前线上：`@huiliyi37/dsh-tianshu-tui@1.0.0-rc.4`（npm `latest`）。发版后更新此行。
 
 ## 仓库坐标
 

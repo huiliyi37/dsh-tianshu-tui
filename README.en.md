@@ -38,7 +38,7 @@ It is a **presentation-only plugin**: agent state comes from the session event s
 | Node.js | `^22.19 || >=24` |
 | Package manager | [`pnpm`](https://pnpm.io/installation), available through `corepack enable` |
 | DeepSeek Harness | `@deepseek-ai/dsh@0.2.1-rc.4`, published on the npm `next` channel |
-| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.3` |
+| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.4` |
 
 > **Use the host `@next` tag explicitly.** Do not substitute the host `@latest` tag (currently `0.2.1-rc.2`, below the required version). The `@alpha` release `0.2.2-alpha.2` has known API incompatibilities and is not supported yet. This package is not a standalone CLI.
 
@@ -124,7 +124,7 @@ npm installs check for updates at startup. You can also run `/update` inside the
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-Current release: **[`1.0.0-rc.3`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.3)**, adapted to host `0.2.1-rc.4`. See [CHANGELOG.md](CHANGELOG.md) for release history, or run `/changelog` inside the TUI.
+Current release: **[`1.0.0-rc.4`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.4)**, adapted to host `0.2.1-rc.4`. This release fixes [#61](https://github.com/huiliyi37/dsh-tianshu-tui/issues/61): WSL/native API-key paste, provider directory and account entry behavior, plus custom pi-ai endpoints, model discovery, and existing-route editing. See [CHANGELOG.md](CHANGELOG.md) for release history, or run `/changelog` inside the TUI.
 
 ## Documentation
 
