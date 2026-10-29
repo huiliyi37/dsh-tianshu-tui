@@ -17,9 +17,8 @@ export interface FormatStarWhaleLogoInput {
 }
 /**
  * 抱星鲸鱼像素画：返回在 width 内水平居中的 ANSI 行数组（STAR_WHALE_ROWS 行）。
- * 降级矩阵同 formatWhaleLogo：窄屏/矮屏/无色/legacy conhost（full 宽度档）
- * 返回空数组（调用方回落 retro 鲸鱼或纯文字品牌区）。
- * 宽度守恒：任何输出行 displayWidth ≤ width；画不截断，放不下即整体降级。
+ * 窄屏、矮屏或无色终端返回空数组；双列块字符终端横向成对采样，
+ * 以较低横向分辨率保留构图和显示宽度。
  * @param input - 终端尺寸与颜色能力等级。
  * @returns 居中 ANSI 行数组；降级时空数组。
  */

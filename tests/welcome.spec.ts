@@ -2,25 +2,40 @@
  * 启动欢迎面（format/welcome.ts）— 纯渲染契约测试。
  *
  * - 品牌区 formatBrandWelcome：主标/副标；缺省居中，align=left 贴左
- * - Tips formatWelcomeTips：标题 + 快捷键列对齐；不可用项 muted
- * - 环境行 formatEnvCheckLine：单行主题名/API/Git；缺 key 段 warning 色
- * - Hero formatWelcomeHero：宽屏左品牌右 tips zip，窄屏垂直居中叠放
+ * - Tips formatWelcomeTips：普通 muted 标题 + 快捷键列对齐，最多四项
+ * - 环境行 formatEnvCheckLine：缺 key 行动提示可按段换行且不截断
+ * - Hero：retro 旧布局不变；blue/star 紧凑降级为左对齐品牌 → Tips → 环境
  * - 宽度守恒：任何输入下每行显示宽度 ≤ width
  */
 
-import { describe, expect, it } from 'vitest'
+import chalk from 'chalk'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { isColorSuppressed, setColorSuppressed } from '../src/engine/ansi.js'
 import type { RivetTheme } from '../src/theme.js'
 import { displayWidth } from '../src/width.js'
 import {
   WELCOME_HERO_WIDE_MIN,
+  WELCOME_TIPS_MAX_ITEMS,
   CHROME_GUTTER,
   formatBrandWelcome,
+  formatCompactWelcomeHero,
   formatEnvCheckLine,
   formatWelcomeHero,
   formatWelcomeTips,
   type WelcomeEnvCheck,
   type WelcomeTipItem,
 } from '../src/format/welcome.js'
+
+const savedSuppressed = isColorSuppressed()
+const savedLevel = chalk.level
+beforeEach(() => {
+  setColorSuppressed(false)
+  chalk.level = 3
+})
+afterAll(() => {
+  setColorSuppressed(savedSuppressed)
+  chalk.level = savedLevel
+})
 
 function fakeTheme(): RivetTheme {
   return {
@@ -91,13 +106,33 @@ describe('formatBrandWelcome（欢迎页品牌区）', () => {
 })
 
 describe('formatWelcomeTips（欢迎页右栏 tips）', () => {
-  it('标题 Tips + 快捷键列对齐、说明在右', () => {
-    const lines = plain(formatWelcomeTips({ width: 40, items: tips() }, fakeTheme()))
+  it('标题 Tips 普通字重 muted + 快捷键列对齐、说明在右', () => {
+    const raw = formatWelcomeTips({ width: 40, items: tips() }, fakeTheme())
+    const lines = plain(raw)
     expect(lines[0]!.trim()).toBe('Tips')
+    expect(raw[0]).toContain('\x1B[38;2;119;119;119m')
+    expect(raw[0]).not.toContain('\x1B[1m')
     expect(lines[1]).toContain('ctrl+n')
     expect(lines[1]).toContain('新会话')
     expect(lines[2]).toContain('ctrl+s')
     expect(lines[3]).toContain('ctrl+p')
+  })
+
+  it('动态项与默认项合计最多四项，保持传入优先级', () => {
+    const items: WelcomeTipItem[] = [
+      { keyHint: '/key', label: '配置 API key' },
+      { keyHint: '/help', label: '命令帮助面板' },
+      ...tips(),
+      { keyHint: '/', label: 'slash 命令' },
+      { keyHint: 'ctrl+o', label: '展开推理' },
+    ]
+    const lines = plain(formatWelcomeTips({ width: 40, items }, fakeTheme()))
+    expect(lines).toHaveLength(WELCOME_TIPS_MAX_ITEMS + 1)
+    expect(lines[1]).toContain('/key')
+    expect(lines[2]).toContain('/help')
+    expect(lines[3]).toContain('ctrl+n')
+    expect(lines[4]).toContain('ctrl+s')
+    expect(lines.join('\n')).not.toContain('ctrl+o')
   })
 
   it('available=false：整行 muted，keyHint 仍在', () => {
@@ -148,10 +183,13 @@ describe('formatEnvCheckLine（环境检查紧凑行）', () => {
     expect(line!.startsWith('graphite')).toBe(true)
   })
 
-  it('缺 API key：✗ + 可行动提示，该段 warning 色', () => {
-    const [line] = formatEnvCheckLine(env({ hasApiKey: false }), fakeTheme())
-    expect(plain([line!])[0]).toContain('API Key ✗（设 DEEPSEEK_API_KEY）')
-    expect(line).toContain('\x1B[38;2;68;68;68m')
+  it('缺 API key：完整保留环境变量与 /key 行动提示，该段 warning 色', () => {
+    const lines = formatEnvCheckLine(env({ hasApiKey: false }), fakeTheme())
+    const text = plain(lines).join('\n')
+    expect(text).toContain('API Key ✗')
+    expect(text).toContain('DEEPSEEK_API_KEY')
+    expect(text).toContain('/key')
+    expect(lines.join('\n')).toContain('\x1B[38;2;68;68;68m')
   })
 
   it('非 git → Git ✗ 信息性展示，无 warning 色', () => {
@@ -160,10 +198,33 @@ describe('formatEnvCheckLine（环境检查紧凑行）', () => {
     expect(line).not.toContain('\x1B[38;2;68;68;68m')
   })
 
-  it('窄宽截断：宽度守恒（ANSI 安全）', () => {
+  it('窄宽按段换行：宽度守恒且缺 key 指引不截断', () => {
     for (const cols of [24, 12, 5]) {
-      const [line] = formatEnvCheckLine(env({ cols }), fakeTheme())
-      expect(displayWidth(line!)).toBeLessThanOrEqual(cols)
+      const lines = formatEnvCheckLine(env({ cols }), fakeTheme())
+      for (const line of lines) expect(displayWidth(line)).toBeLessThanOrEqual(cols)
+    }
+    const lines = formatEnvCheckLine(env({ cols: 32, hasApiKey: false, align: 'left' }), fakeTheme())
+    expect(lines.length).toBeGreaterThan(1)
+    const text = plain(lines).join('\n')
+    expect(text).toContain('DEEPSEEK_API_KEY')
+    expect(text).toContain('/key')
+    for (const line of lines) expect(displayWidth(line)).toBeLessThanOrEqual(32)
+  })
+
+  it('full 宽度档按分隔符实际宽度换行，行动提示仍完整', () => {
+    const previous = process.env.RIVET_AMBIGUOUS_WIDTH
+    process.env.RIVET_AMBIGUOUS_WIDTH = 'full'
+    try {
+      for (const cols of [20, 24, 32, 40]) {
+        const lines = formatEnvCheckLine(env({ cols, hasApiKey: false, align: 'left' }), fakeTheme())
+        const text = plain(lines).join('\n')
+        expect(text).toContain('DEEPSEEK_API_KEY')
+        expect(text).toContain('/key')
+        for (const line of lines) expect(displayWidth(line)).toBeLessThanOrEqual(cols)
+      }
+    } finally {
+      if (previous === undefined) delete process.env.RIVET_AMBIGUOUS_WIDTH
+      else process.env.RIVET_AMBIGUOUS_WIDTH = previous
     }
   })
 
@@ -240,7 +301,51 @@ describe('formatWelcomeHero（左品牌 + 右 tips）', () => {
     expect(dsh.indexOf('dsh-tianshu-tui')).toBe(CHROME_GUTTER)
   })
 
+  it('显式 retro 保持环境在 Tips 前的旧布局', () => {
+    const lines = plain(formatWelcomeHero({ width: 60, whale, env, tips: tips() }, fakeTheme()))
+    const envIdx = lines.findIndex(l => l.includes('API Key'))
+    const tipsIdx = lines.findIndex(l => l.includes('Tips'))
+    expect(envIdx).toBeGreaterThanOrEqual(0)
+    expect(tipsIdx).toBeGreaterThan(envIdx)
+  })
+
   it('width ≤ 0 → 空数组', () => {
     expect(formatWelcomeHero({ width: 0, whale, env, tips: tips() }, fakeTheme())).toEqual([])
+  })
+})
+
+describe('formatCompactWelcomeHero（blue/star 紧凑降级）', () => {
+  it('单列左对齐：品牌 → 最多四项 Tips → 环境，缺 key 提示完整', () => {
+    const items: WelcomeTipItem[] = [
+      { keyHint: '/key', label: '配置 API key' },
+      { keyHint: '/help', label: '命令帮助面板' },
+      ...tips(),
+      { keyHint: '/', label: 'slash 命令' },
+      { keyHint: 'ctrl+o', label: '展开推理' },
+    ]
+    const lines = formatCompactWelcomeHero({
+      width: 60,
+      env: { hasApiKey: false, isGitRepo: true, themeName: 'graphite', cols: 100 },
+      tips: items,
+    }, fakeTheme())
+    const text = plain(lines)
+    expect(text[0]).toBe(`${' '.repeat(CHROME_GUTTER)}dsh-tianshu-tui`)
+    const tipsIdx = text.findIndex(l => l.includes('Tips'))
+    const envIdx = text.findIndex(l => l.includes('API Key'))
+    expect(tipsIdx).toBeGreaterThan(0)
+    expect(envIdx).toBeGreaterThan(tipsIdx)
+    expect(text.slice(tipsIdx + 1, envIdx).filter(l => l.trim() !== '')).toHaveLength(WELCOME_TIPS_MAX_ITEMS)
+    expect(text.join('\n')).not.toContain('ctrl+o')
+    expect(text.join('\n')).toContain('DEEPSEEK_API_KEY')
+    expect(text.join('\n')).toContain('/key')
+    for (const line of lines) expect(displayWidth(line)).toBeLessThanOrEqual(60)
+  })
+
+  it('width ≤ 0 → 空数组', () => {
+    expect(formatCompactWelcomeHero({
+      width: 0,
+      env: { hasApiKey: true, isGitRepo: true, themeName: 'graphite', cols: 100 },
+      tips: tips(),
+    }, fakeTheme())).toEqual([])
   })
 })

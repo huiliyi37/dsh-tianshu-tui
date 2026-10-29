@@ -1,14 +1,15 @@
 /**
  * 欢迎页鲸鱼像素画（format/whale.ts）— 纯渲染契约测试。
  *
- * - 降级矩阵：窄屏/矮屏/无色/legacy conhost（full 宽度档）均返回空数组
+ * - 降级与兼容：窄屏/矮屏/无色返回空数组；full 档横向成对采样出图
  * - 半块渲染：仅 ▀▄█ 与空格；每行 RESET 收尾（无颜色泄漏）；行尾不补空格
  * - 色深轨：≥2 走品牌 hex（truecolor/256 量化），1 走命名 16 色
  * - 宽度守恒：任何出画宽度下每行显示宽度 ≤ width，且整块水平居中
  */
 
 import chalk from 'chalk'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { isColorSuppressed, setColorSuppressed } from '../src/engine/ansi.js'
 import {
   formatWhaleLogo,
   WHALE_COLS,
@@ -17,6 +18,17 @@ import {
   WHALE_ROWS,
 } from '../src/format/whale.js'
 import { displayWidth } from '../src/width.js'
+
+const savedSuppressed = isColorSuppressed()
+const savedLevel = chalk.level
+beforeEach(() => {
+  setColorSuppressed(false)
+  chalk.level = 3
+})
+afterAll(() => {
+  setColorSuppressed(savedSuppressed)
+  chalk.level = savedLevel
+})
 
 function plain(lines: readonly string[]): string[] {
   return lines.map(l => l.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, ''))
@@ -47,9 +59,18 @@ describe('formatWhaleLogo（降级矩阵）', () => {
     expect(formatWhaleLogo(input({ colorLevel: 0 }))).toEqual([])
   })
 
-  it('legacy conhost（ambiguous full 档，块字符按 2 列渲染）→ 空数组', () => {
+  it('legacy conhost（ambiguous full 档）→ 横向成对采样出图且宽度守恒', () => {
     process.env.RIVET_AMBIGUOUS_WIDTH = 'full'
-    expect(formatWhaleLogo(input())).toEqual([])
+    const lines = formatWhaleLogo(input())
+    expect(lines).toHaveLength(WHALE_ROWS)
+    expect(lines.some(line => /[▀▄█]/.test(line))).toBe(true)
+    for (const line of lines) expect(displayWidth(line)).toBeLessThanOrEqual(100)
+  })
+
+  it('full 档保留 BB..BB 尾鳍的构图坐标', () => {
+    process.env.RIVET_AMBIGUOUS_WIDTH = 'full'
+    const indent = Math.floor((80 - WHALE_COLS) / 2)
+    expect(plain(formatWhaleLogo(input()))[0]).toBe(`${' '.repeat(indent + 16)}████`)
   })
 
   it('门禁边界值恰好满足 → 出画', () => {

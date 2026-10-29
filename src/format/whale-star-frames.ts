@@ -26,7 +26,7 @@ export const STAR_WHALE_FRAME_PALETTE: readonly (`#${string}` | null)[] = [
   '#7d84ea',
   '#ce68f1',
   '#fef5d1',
-  '#fef0ac',
+  '#fde66f',
   '#c87bd5',
   '#bec5fa',
   '#9e39f5',

@@ -29,7 +29,7 @@ export const BLUE_WHALE_FRAME_PALETTE: readonly (`#${string}` | null)[] = [
   '#fdf4b2',
   '#fd8cb2',
   '#c8dbfd',
-  '#1048bf',
+  '#4d6bfe',
   '#479aff',
 ]
 

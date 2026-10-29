@@ -34,12 +34,12 @@ export interface WelcomeEnvCheck {
     align?: 'center' | 'left';
 }
 /**
- * 环境检查紧凑行（欢迎页常驻）：`graphite · API Key ✓ · Git ✓`。
- * 缺 API key 时该段换 warning 色并携带可行动提示（设 DEEPSEEK_API_KEY）；
- * git ✗ 仅信息性展示。用「API Key」措辞（非 footer 的「API ✗」）。
+ * 环境检查行：`graphite · API Key ✓ · Git ✓`。
+ * 缺 API key 时增加「设 DEEPSEEK_API_KEY 或运行 /key」行动段，warning 色；
+ * 超宽按段换行而不是截断行动指引。git ✗ 仅信息性展示。
  * @param env - 环境检查结果（主题名/API key/git/对齐）。
  * @param theme - 当前主题（muted；缺 key 段 warning）。
- * @returns 单行 ANSI；cols ≤ 0 返回空数组。
+ * @returns ANSI 行数组；cols ≤ 0 返回空数组。
  */
 export declare function formatEnvCheckLine(env: WelcomeEnvCheck, theme: RivetTheme): string[];
 /** 欢迎页 Tips 一项（快捷键 + 说明；不可用项整行 muted）。 */
@@ -58,12 +58,14 @@ export interface FormatWelcomeTipsInput {
     /** 水平对齐；宽屏右栏 left，窄屏叠放 center（缺省 left）。 */
     align?: 'center' | 'left';
 }
+/** 欢迎页行动项上限（动态 /key、/help 也计入）。 */
+export declare const WELCOME_TIPS_MAX_ITEMS = 4;
 /**
- * 欢迎页右栏 Tips：标题 + 快捷键列对齐 + 说明。
+ * 欢迎页 Tips：普通字重 muted 标题 + 快捷键列对齐 + 说明，最多四项。
  * 不可用项整行 muted 且仍显示 keyHint（与旧菜单不同：tips 要让用户知道键还在）。
  * 空 items 仍渲染标题（调用方恒有一组默认 tips）。
  * @param input - 宽度、tips 项与对齐。
- * @param theme - 当前主题（标题 brandColor，hint secondary，说明 muted）。
+ * @param theme - 当前主题（标题/说明 muted，hint secondary）。
  * @returns ANSI 行数组。
  */
 export declare function formatWelcomeTips(input: FormatWelcomeTipsInput, theme: RivetTheme): string[];
@@ -88,26 +90,31 @@ export interface FormatWelcomeHeroInput {
  * @returns ANSI 行数组；width ≤ 0 返回空数组。
  */
 export declare function formatWelcomeHero(input: FormatWelcomeHeroInput, theme: RivetTheme): string[];
+/**
+ * blue/star 像素门禁不满足时的紧凑单列：文字品牌 → Tips → 环境，整体左对齐。
+ * 不携带鲸鱼，也不改变显式 retro 的居中/双列旧布局。
+ */
+export declare function formatCompactWelcomeHero(input: Omit<FormatWelcomeHeroInput, 'whale'>, theme: RivetTheme): string[];
 /** star 标题块宽度：standard 宽档 / mini 窄档（生成物实测，welcome-title-frames.ts）。 */
 export declare const STAR_TITLE_MAX_COLS: number;
 export declare const STAR_TITLE_MIN_COLS: number;
 /** star hero 宽屏门禁最小列数（gutter + 画 + 间隙 + 标题窄档）。 */
 export declare const STAR_HERO_MIN_COLS: number;
-/** star hero 矮屏门禁最小行数（右栏约 20 行 + 顶栏/输入轨呼吸）。 */
+/** star hero 静态矮屏门禁；选档另校验右栏高度 + 11 的整页预算。 */
 export declare const STAR_HERO_MIN_ROWS = 24;
-/** blue 标题块宽度：wide（ANSI Shadow）/ mid（Standard）/ mini（Mini），生成物实测。 */
+/** blue 生成物标题宽度常量；运行时中窄档改用 DeepSeek / Harness 文字 lockup。 */
 export declare const BLUE_TITLE_MAX_COLS: number;
 export declare const BLUE_TITLE_MIN_COLS: number;
-/** blue hero 宽屏门禁最小列数（与 star 同构：gutter + 画 + 间隙 + 标题窄档）。 */
+/** blue hero 宽屏门禁最小列数（沿用既有像素布局门禁）。 */
 export declare const BLUE_HERO_MIN_COLS: number;
-/** blue hero 矮屏门禁最小行数（同 star）。 */
+/** blue hero 静态矮屏门禁；选档另校验右栏高度 + 11 的整页预算。 */
 export declare const BLUE_HERO_MIN_ROWS = 24;
 /** formatStarWelcomeHero / formatBlueWelcomeHero 的渲染输入。 */
 export interface FormatStarWelcomeHeroInput {
     width: number;
     /** 终端行数（矮屏门禁）。 */
     rows: number;
-    /** 已渲染的抱星鲸鱼行（空数组 = 画已降级 → 整体回落 retro）。 */
+    /** 已渲染的抱星鲸鱼行（空数组 = 画已降级，由调用方走紧凑单列）。 */
     whale: readonly string[];
     env: WelcomeEnvCheck;
     tips: readonly WelcomeTipItem[];
@@ -120,7 +127,7 @@ export interface FormatStarWelcomeHeroInput {
 export type FormatBlueWelcomeHeroInput = FormatStarWelcomeHeroInput;
 /**
  * star 模式欢迎英雄区：左抱星鲸鱼（紫）+ 右艺术字标题块（DeepSeek» /
- * < Harness > / @tianshu·版本 / 环境行 / Tips）zip。布局/降级矩阵见
+ * < Harness > / @tianshu·版本 / Tips / 环境行）zip。布局/降级矩阵见
  * formatPixelWelcomeHero；门禁常量 STAR_HERO_MIN_COLS / STAR_HERO_MIN_ROWS。
  * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
  * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
@@ -128,11 +135,11 @@ export type FormatBlueWelcomeHeroInput = FormatStarWelcomeHeroInput;
  */
 export declare function formatStarWelcomeHero(input: FormatStarWelcomeHeroInput, theme: RivetTheme): string[];
 /**
- * blue 模式欢迎英雄区（默认风格）：左蓝鲸抱星 + 右 ANSI Shadow 艺术字
- * 标题块（DeepSeek / < Harness > / @tianshu·版本 / 环境行 / Tips）zip。
- * 标题三档伸缩：ANSI Shadow（64）→ Standard（44）→ Mini（33）。
- * 布局/降级矩阵见 formatPixelWelcomeHero；门禁常量 BLUE_HERO_MIN_COLS /
- * BLUE_HERO_MIN_ROWS。
+ * blue 模式欢迎英雄区（默认风格）：左蓝鲸抱星 + 右标题块
+ * （DeepSeek / Harness / @tianshu·版本 / Tips / 环境行）zip。
+ * 宽档使用 ANSI Shadow；中窄档使用简洁 DeepSeek / Harness 文字 lockup，
+ * full 宽度档不用双宽块字符 ANSI Shadow。布局/降级矩阵见
+ * formatPixelWelcomeHero；门禁常量 BLUE_HERO_MIN_COLS / BLUE_HERO_MIN_ROWS。
  * @param input - 终端尺寸、鲸鱼行、环境检查、tips 项。
  * @param theme - 当前主题（标题 brandColor BOLD、副标 secondary、标识/环境 muted）。
  * @returns ANSI 行数组；降级时空数组。

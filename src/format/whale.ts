@@ -71,11 +71,8 @@ export interface FormatWhaleLogoInput {
 
 /**
  * 欢迎页鲸鱼像素画：返回在 width 内水平居中的 ANSI 行数组（WHALE_ROWS 行）。
- * 降级矩阵（任一不满足返回空数组，调用方回落纯文字品牌区）：
- * - `width ≥ WHALE_MIN_COLS` 且 `rows ≥ WHALE_MIN_ROWS`
- * - `colorLevel ≥ 1`（无色终端画不出品牌色，纯剪影无识别度）
- * - `ambiguousWidthMode() !== 'full'`（legacy conhost 块字符按 2 列渲染）
- * 宽度守恒：任何输出行 displayWidth ≤ width；画不截断，放不下即整体降级。
+ * 窄屏、矮屏或无色终端返回空数组；双列块字符终端横向成对采样，
+ * 以较低横向分辨率保留构图和显示宽度，不再直接丢弃像素画。
  * @param input - 终端尺寸与颜色能力等级。
  * @returns 居中 ANSI 行数组；降级时空数组。
  */
@@ -83,9 +80,9 @@ export function formatWhaleLogo(input: FormatWhaleLogoInput): string[] {
   const level = input.colorLevel ?? chalk.level
   if (level < 1) return []
   if (input.width < WHALE_MIN_COLS || input.rows < WHALE_MIN_ROWS) return []
-  if (ambiguousWidthMode() === 'full') return []
 
+  const full = ambiguousWidthMode() === 'full'
   const palette = level >= 2 ? TRUECOLOR_PALETTE : ANSI16_PALETTE
   const indent = Math.max(0, Math.floor((input.width - WHALE_COLS) / 2))
-  return blitPixelGrid({ grid: GRID, cols: WHALE_COLS, palette, indent })
+  return blitPixelGrid({ grid: GRID, cols: WHALE_COLS, palette, indent, xScale: full ? 2 : 1 })
 }

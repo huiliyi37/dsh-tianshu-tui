@@ -3787,6 +3787,20 @@ describe('TuiApp API key 就绪（credentials 分层，非仅 env）', () => {
     return { app, stdout, describe }
   }
 
+  function plainOutput(written: string): string {
+    return written.replace(/\x1B\[[0-9;?]*[ -/]*[@-~]/g, '')
+  }
+
+  function scrollbackOutput(app: TuiApp): string {
+    return (app as unknown as { commit: { getContent(): string } }).commit.getContent()
+  }
+
+  function welcomeActions(app: TuiApp): string {
+    const plain = plainOutput(scrollbackOutput(app))
+    const start = plain.indexOf('Tips')
+    return start < 0 ? '' : plain.slice(start)
+  }
+
   it('credentials 报 file 已配置、env 未设 → 欢迎页 API Key ✓、footer API ✓', async () => {
     const { app, stdout, describe } = boot({ credentials: { configured: true, source: 'file' } })
     await app.attach()
@@ -3798,18 +3812,23 @@ describe('TuiApp API key 就绪（credentials 分层，非仅 env）', () => {
     await app.dispose()
   })
 
-  it('credentials 未配置且 env 未设 → 欢迎页 API Key ✗，且 Tips 排首引导 /key', async () => {
-    const { app, stdout } = boot({ credentials: { configured: false } })
+  it('credentials 未配置且 env 未设 → /key 第一、首次 /help 第二，合计最多四项', async () => {
+    const { app } = boot({ credentials: { configured: false } })
     await app.attach()
-    const written = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
-    expect(written).toContain('API Key ✗（设 DEEPSEEK_API_KEY）')
-    // 动态引导：未登录时 Tips 第一条是 /key 配置入口
-    expect(written).toContain('/key')
-    expect(written).toContain('配置 API key')
+    const welcome = welcomeActions(app)
+    expect(welcome).toContain('API Key ✗')
+    expect(welcome).toContain('DEEPSEEK_API_KEY')
+    expect(welcome.indexOf('/key')).toBeLessThan(welcome.indexOf('/help'))
+    expect(welcome.indexOf('/help')).toBeLessThan(welcome.indexOf('ctrl+n'))
+    expect(welcome.indexOf('ctrl+n')).toBeLessThan(welcome.indexOf('ctrl+s'))
+    expect(welcome).not.toContain('ctrl+p')
+    expect(welcome).not.toContain('slash 命令')
+    expect(welcome).not.toContain('ctrl+o')
+    expect(welcome).not.toContain('shift+tab')
     await app.dispose()
   })
 
-  it('credentials 已配置 → 欢迎页 Tips 不含 /key 引导（首条为 ctrl+n）', async () => {
+  it('credentials 已配置 → 欢迎页 Tips 不含 /key 引导', async () => {
     const { app, stdout } = boot({ credentials: { configured: true, source: 'file' } })
     await app.attach()
     const written = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
@@ -3818,13 +3837,42 @@ describe('TuiApp API key 就绪（credentials 分层，非仅 env）', () => {
     await app.dispose()
   })
 
-  it('首次运行：欢迎页 Tips 含 /help 命令帮助面板引导（onboarding 一次性）', async () => {
+  it('首次运行：/help 在默认行动项之前（onboarding 一次性）', async () => {
     // VITEST 下 prefs 禁用 → onboarded 恒未标记 → 欢迎页恒展示 onboarding tip
-    const { app, stdout } = boot({ credentials: { configured: true, source: 'file' } })
+    const { app } = boot({ credentials: { configured: true, source: 'file' } })
     await app.attach()
-    const written = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
-    expect(written).toContain('/help')
-    expect(written).toContain('命令帮助面板')
+    const welcome = welcomeActions(app)
+    expect(welcome).toContain('/help')
+    expect(welcome).toContain('命令帮助面板')
+    expect(welcome.indexOf('/help')).toBeLessThan(welcome.indexOf('ctrl+n'))
+    await app.dispose()
+  })
+
+  it('非首次且已有 key：默认四项为 ctrl+n / ctrl+s / ctrl+p / slash，无旧快捷键', async () => {
+    const { app } = boot({ credentials: { configured: true, source: 'file' } })
+    ;(app as unknown as { prefs: { onboarded: boolean } }).prefs.onboarded = true
+    await app.attach()
+    const welcome = welcomeActions(app)
+    expect(welcome.indexOf('ctrl+n')).toBeLessThan(welcome.indexOf('ctrl+s'))
+    expect(welcome.indexOf('ctrl+s')).toBeLessThan(welcome.indexOf('ctrl+p'))
+    expect(welcome.indexOf('ctrl+p')).toBeLessThan(welcome.indexOf('slash 命令'))
+    expect(welcome).not.toContain('ctrl+o')
+    expect(welcome).not.toContain('shift+tab')
+    await app.dispose()
+  })
+
+  it('blue 窄屏 → 紧凑单列品牌 → Tips → 环境，完整保留缺 key 指引', async () => {
+    const { app, stdout } = boot({ credentials: { configured: false } })
+    stdout.columns = 60
+    await app.attach()
+    const plain = plainOutput(scrollbackOutput(app))
+    const welcome = welcomeActions(app)
+    expect(plain).toContain('dsh-tianshu-tui')
+    expect(plain.indexOf('dsh-tianshu-tui')).toBeLessThan(plain.indexOf('Tips'))
+    expect(welcome).toContain('API Key ✗')
+    expect(welcome).toContain('DEEPSEEK_API_KEY')
+    expect(welcome).toContain('/key')
+    expect(plain).not.toMatch(/[▀▄█]/)
     await app.dispose()
   })
 

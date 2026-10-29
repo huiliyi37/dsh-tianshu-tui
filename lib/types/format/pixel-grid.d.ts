@@ -8,6 +8,8 @@ export interface BlitPixelGridInput {
     palette: Readonly<Record<string, string>>;
     /** 左侧缩进列数（居中由调用方算好传入）。 */
     indent: number;
+    /** 横向采样步长：双列块字符终端取 2，保持原画显示宽度；缺省 1。 */
+    xScale?: 1 | 2;
 }
 /**
  * 像素网格 → 居中 ANSI 行数组（grid.length / 2 行）。

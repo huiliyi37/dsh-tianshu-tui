@@ -1,9 +1,9 @@
 /**
  * blue 模式欢迎英雄区（format/welcome.ts formatBlueWelcomeHero）— 契约测试。
  *
- * - 降级矩阵：窄屏/矮屏/无色/full 宽度档/画已降级 → 空数组（调用方回落 retro）
- * - 布局：左蓝鲸抱星（品牌块锚定对齐）+ 右艺术字标题块（ANSI Shadow
- *   DeepSeek / < Harness > / @tianshu·版本 / 环境行 / Tips）zip
+ * - 降级与兼容：窄屏/矮屏/无色/画已降级 → 空数组；full 档隔点采样出图
+ * - 布局：左蓝鲸抱星（品牌块锚定对齐）+ 右标题块（宽档 ANSI Shadow，
+ *   中窄档 DeepSeek / Harness 文字 lockup / @tianshu·版本 / Tips / 环境行）zip
  * - 宽度守恒：任何出画宽度下每行显示宽度 ≤ width
  */
 
@@ -23,6 +23,7 @@ import {
   type WelcomeTipItem,
 } from '../src/format/welcome.js'
 import { BLUE_WHALE_COLS, formatBlueWhaleLogo } from '../src/format/whale-blue.js'
+import { BLUE_TITLE_ART } from '../src/format/welcome-title-frames.js'
 
 // 颜色断言须与运行环境无关：显式解除 NO_COLOR 压制并固定 truecolor 档，用后复原。
 const savedSuppressed = isColorSuppressed()
@@ -97,9 +98,26 @@ describe('formatBlueWelcomeHero（降级矩阵）', () => {
     expect(formatBlueWelcomeHero(input({ whale: [] }), fakeTheme())).toEqual([])
   })
 
-  it('legacy conhost（full 宽度档）→ 空数组', () => {
+  it('legacy conhost（full 宽度档）→ 文字标题 + 隔点像素，坐标与宽度守恒', () => {
     process.env.RIVET_AMBIGUOUS_WIDTH = 'full'
-    expect(formatBlueWelcomeHero(input(), fakeTheme())).toEqual([])
+    const width = 120
+    const whale = blueWhale(width)
+    const lines = formatBlueWelcomeHero(input({ width, whale }), fakeTheme())
+    const text = plain(lines)
+    expect(lines.length).toBeGreaterThan(0)
+    expect(text.some(line => /[▀▄█]/.test(line))).toBe(true)
+    expect(text.some(line => line.includes('DeepSeek'))).toBe(true)
+    expect(text.some(line => line.includes('Harness'))).toBe(true)
+    expect(text.join('\n')).not.toContain('╗')
+    const title = text.find(line => line.includes('DeepSeek'))!
+    const indent = Math.max(0, Math.floor((width - BLUE_WHALE_COLS) / 2))
+    const leftW = Math.max(0, ...whale.map(line => {
+      const leading = line.match(/^ */)?.[0].length ?? 0
+      return displayWidth(line.slice(Math.min(indent, leading)))
+    }))
+    expect(title.startsWith(' '.repeat(CHROME_GUTTER))).toBe(true)
+    expect(displayWidth(title.slice(0, title.indexOf('DeepSeek')))).toBe(CHROME_GUTTER + leftW + 3)
+    for (const line of lines) expect(displayWidth(line)).toBeLessThanOrEqual(width)
   })
 
   it('门禁边界值恰好满足 → 出画', () => {
@@ -109,22 +127,20 @@ describe('formatBlueWelcomeHero（降级矩阵）', () => {
 })
 
 describe('formatBlueWelcomeHero（布局与内容）', () => {
-  it('右栏：艺术字标题块 + @tianshu·版本 + 环境行 + Tips，左栏鲸鱼同行 zip', () => {
-    // 宽屏（120）：wide 标题档（ANSI Shadow 块字 + ╗ 阴影描边）
+  it('右栏：完整艺术标题 + @tianshu·版本 + Tips + 环境，左栏鲸鱼同行 zip', () => {
     const lines = formatBlueWelcomeHero(input({ version: '0.1.2-rc.28', width: 120 }), fakeTheme())
     const text = plain(lines)
-    // 标题块为 ANSI Shadow 艺术字（█ 块字 + ╗╝ 阴影）；@tianshu 标识行含版本
-    expect(text.some(l => l.includes('██'))).toBe(true)
-    expect(text.some(l => l.includes('╗'))).toBe(true)
+    for (const artLine of [...BLUE_TITLE_ART.wide.title, ...BLUE_TITLE_ART.wide.subtitle]) {
+      expect(text.some(line => line.includes(artLine))).toBe(true)
+    }
     expect(text.some(l => l.includes('@tianshu · v0.1.2-rc.28'))).toBe(true)
     expect(text.some(l => l.includes('graphite · API Key ✓ · Git ✓'))).toBe(true)
     expect(text.some(l => l.includes('Tips'))).toBe(true)
     expect(text.some(l => l.includes('ctrl+n'))).toBe(true)
+    expect(text.findIndex(l => l.includes('API Key'))).toBeGreaterThan(text.findIndex(l => l.includes('Tips')))
     // zip：第 0 行即含标题艺术行（左栏垂直居中垫空行时右栏仍出字）
     expect(text[0]).toContain('██')
-    // 鲸鱼为半块像素画（▀▄█），出现在后续行
     expect(text.some(l => /[▀▄]/.test(l))).toBe(true)
-    // gutter：首列留白
     expect(text[0]!.startsWith(' '.repeat(CHROME_GUTTER))).toBe(true)
   })
 
@@ -157,21 +173,36 @@ describe('formatBlueWelcomeHero（布局与内容）', () => {
     expect(BLUE_TITLE_MIN_COLS).toBe(33)
   })
 
-  it('标题选档：宽→窄 ANSI Shadow / Standard / Mini', () => {
-    // 右栏起点 = gutter + 画宽 + 间隙（左栏 padTo 恒补齐到画宽 44）；只切右栏
-    // 断言，避开鲸鱼半块画自身的 █ 字符干扰（标题档与画同含 ██）。
-    const RIGHT_START = CHROME_GUTTER + BLUE_WHALE_COLS + 3
-    // 120 列：右栏 71 ≥ 64 → wide（ANSI Shadow：块字 + ╗ 阴影描边，画无 ╗）
-    const wide = plain(formatBlueWelcomeHero(input({ width: 120 }), fakeTheme())).map(l => l.slice(RIGHT_START))
+  it('标题选档：wide 放不下时用完整 DeepSeek / Harness 文字 lockup', () => {
+    const wide = plain(formatBlueWelcomeHero(input({ width: 120, rows: 27 }), fakeTheme()))
     expect(wide.some(l => l.includes('╗'))).toBe(true)
-    // 99 列：右栏 50，44 ≤ 50 < 64 → mid（Standard：下划线字形，无阴影描边）
-    const mid = plain(formatBlueWelcomeHero(input({ width: 99 }), fakeTheme())).map(l => l.slice(RIGHT_START))
-    expect(mid.some(l => l.includes('____'))).toBe(true)
-    expect(mid.some(l => l.includes('╗'))).toBe(false)
-    // 82 列（门禁边界）：右栏 33 < 44 → mini（无块字，有 |_ 字形）
-    const mini = plain(formatBlueWelcomeHero(input({ width: BLUE_HERO_MIN_COLS }), fakeTheme())).map(l => l.slice(RIGHT_START))
-    expect(mini.some(l => l.includes('╗'))).toBe(false)
-    expect(mini.some(l => l.includes('|_'))).toBe(true)
+    for (const width of [99, BLUE_HERO_MIN_COLS]) {
+      const text = plain(formatBlueWelcomeHero(input({ width }), fakeTheme()))
+      expect(text.some(l => l.includes('DeepSeek'))).toBe(true)
+      expect(text.some(l => l.includes('Harness'))).toBe(true)
+      expect(text.join('\n')).not.toContain('____')
+      expect(text.join('\n')).not.toContain('|_')
+      expect(text.join('\n')).not.toContain('╗')
+    }
+  })
+
+  it('高度选档：wide 右栏 + 11 超预算时落文字档，足够时保留 wide', () => {
+    const compactTitle = plain(formatBlueWelcomeHero(input({ width: 120, rows: 26 }), fakeTheme()))
+    expect(compactTitle.some(l => l.includes('DeepSeek'))).toBe(true)
+    expect(compactTitle.join('\n')).not.toContain('╗')
+    const wideTitle = plain(formatBlueWelcomeHero(input({ width: 120, rows: 27 }), fakeTheme()))
+    expect(wideTitle.join('\n')).toContain('╗')
+  })
+
+  it('缺 key 时窄右栏换行仍保留完整行动指引', () => {
+    const lines = formatBlueWelcomeHero(input({
+      width: BLUE_HERO_MIN_COLS,
+      env: { ...env, hasApiKey: false },
+    }), fakeTheme())
+    const text = plain(lines).join('\n')
+    expect(text).toContain('DEEPSEEK_API_KEY')
+    expect(text).toContain('/key')
+    expect(text.indexOf('Tips')).toBeLessThan(text.indexOf('API Key'))
   })
 
   it('宽度守恒：82–140 全扫', () => {

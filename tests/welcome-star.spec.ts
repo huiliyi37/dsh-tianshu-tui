@@ -1,9 +1,9 @@
 /**
  * star 模式欢迎英雄区（format/welcome.ts formatStarWelcomeHero）— 契约测试。
  *
- * - 降级矩阵：窄屏/矮屏/无色/full 宽度档/画已降级 → 空数组（调用方回落 retro）
+ * - 降级与兼容：窄屏/矮屏/无色/画已降级 → 空数组；full 档隔点采样出图
  * - 布局：左抱星鲸鱼（品牌块锚定对齐）+ 右艺术字标题块（DeepSeek» / < Harness > /
- *   @tianshu·版本 / 环境行 / Tips）zip
+ *   @tianshu·版本 / Tips / 环境行）zip
  * - 宽度守恒：任何出画宽度下每行显示宽度 ≤ width
  */
 
@@ -23,6 +23,7 @@ import {
   type WelcomeTipItem,
 } from '../src/format/welcome.js'
 import { formatStarWhaleLogo } from '../src/format/whale-star.js'
+import { STAR_TITLE_ART } from '../src/format/welcome-title-frames.js'
 
 // 颜色断言须与运行环境无关：显式解除 NO_COLOR 压制并固定 truecolor 档，用后复原。
 const savedSuppressed = isColorSuppressed()
@@ -97,33 +98,39 @@ describe('formatStarWelcomeHero（降级矩阵）', () => {
     expect(formatStarWelcomeHero(input({ whale: [] }), fakeTheme())).toEqual([])
   })
 
-  it('legacy conhost（full 宽度档）→ 空数组', () => {
+  it('legacy conhost（full 宽度档）→ 完整 mini 标题 + 隔点像素，宽度守恒', () => {
     process.env.RIVET_AMBIGUOUS_WIDTH = 'full'
-    expect(formatStarWelcomeHero(input(), fakeTheme())).toEqual([])
+    const lines = formatStarWelcomeHero(input(), fakeTheme())
+    const text = plain(lines)
+    expect(lines.length).toBeGreaterThan(0)
+    expect(text.some(line => /[▀▄█]/.test(line))).toBe(true)
+    for (const artLine of [...STAR_TITLE_ART.mini.title, ...STAR_TITLE_ART.mini.subtitle]) {
+      expect(text.some(line => line.includes(artLine))).toBe(true)
+    }
+    for (const line of lines) expect(displayWidth(line)).toBeLessThanOrEqual(100)
   })
 
-  it('门禁边界值恰好满足 → 出画', () => {
-    const lines = formatStarWelcomeHero(input({ width: STAR_HERO_MIN_COLS, rows: STAR_HERO_MIN_ROWS }), fakeTheme())
+  it('门禁边界满足且 mini 右栏 + 11 行预算可容纳 → 出画', () => {
+    const lines = formatStarWelcomeHero(input({ width: STAR_HERO_MIN_COLS, rows: 26 }), fakeTheme())
     expect(lines.length).toBeGreaterThan(0)
+    expect(plain(lines).some(line => line.includes('|_'))).toBe(true)
   })
 })
 
 describe('formatStarWelcomeHero（布局与内容）', () => {
-  it('右栏：艺术字标题块 + @tianshu·版本 + 环境行 + Tips，左栏鲸鱼同行 zip', () => {
-    // 宽屏（120）：standard 标题档（下划线/斜杠艺术行；mini 档无下划线字形）
-    const lines = formatStarWelcomeHero(input({ version: '0.1.2-rc.28', width: 120 }), fakeTheme())
+  it('右栏：完整艺术标题 + @tianshu·版本 + Tips + 环境，左栏鲸鱼同行 zip', () => {
+    const lines = formatStarWelcomeHero(input({ version: '0.1.2-rc.28', width: 120, rows: 31 }), fakeTheme())
     const text = plain(lines)
-    // 标题块为 figlet 艺术字（下划线/斜杠行）；@tianshu 标识行含版本
-    expect(text.some(l => l.includes('____'))).toBe(true)
+    for (const artLine of [...STAR_TITLE_ART.standard.title, ...STAR_TITLE_ART.standard.subtitle]) {
+      expect(text.some(line => line.includes(artLine))).toBe(true)
+    }
     expect(text.some(l => l.includes('@tianshu · v0.1.2-rc.28'))).toBe(true)
     expect(text.some(l => l.includes('graphite · API Key ✓ · Git ✓'))).toBe(true)
     expect(text.some(l => l.includes('Tips'))).toBe(true)
     expect(text.some(l => l.includes('ctrl+n'))).toBe(true)
-    // zip：第 0 行即含标题艺术行（左栏垂直居中垫空行时右栏仍出字）
+    expect(text.findIndex(l => l.includes('API Key'))).toBeGreaterThan(text.findIndex(l => l.includes('Tips')))
     expect(text[0]).toContain('____')
-    // 鲸鱼为半块像素画（▀▄█），出现在后续行
     expect(text.some(l => /[▀▄█]/.test(l))).toBe(true)
-    // gutter：首列留白
     expect(text[0]!.startsWith(' '.repeat(CHROME_GUTTER))).toBe(true)
   })
 
@@ -154,6 +161,28 @@ describe('formatStarWelcomeHero（布局与内容）', () => {
     // standard 档 50 / mini 档 34（welcome-title-frames.ts 生成物实测）
     expect(STAR_TITLE_MAX_COLS).toBe(50)
     expect(STAR_TITLE_MIN_COLS).toBe(34)
+  })
+
+  it('宽高选档：standard 高超预算时完整回落 mini，高度足够再选 standard', () => {
+    const mini = plain(formatStarWelcomeHero(input({ width: 120, rows: 30 }), fakeTheme()))
+    for (const artLine of [...STAR_TITLE_ART.mini.title, ...STAR_TITLE_ART.mini.subtitle]) {
+      expect(mini.some(line => line.includes(artLine))).toBe(true)
+    }
+    expect(mini.join('\n')).not.toContain('____')
+    const standard = plain(formatStarWelcomeHero(input({ width: 120, rows: 31 }), fakeTheme()))
+    for (const artLine of [...STAR_TITLE_ART.standard.title, ...STAR_TITLE_ART.standard.subtitle]) {
+      expect(standard.some(line => line.includes(artLine))).toBe(true)
+    }
+  })
+
+  it('缺 key 时环境在 Tips 后且完整保留行动指引', () => {
+    const lines = formatStarWelcomeHero(input({
+      env: { ...env, hasApiKey: false },
+    }), fakeTheme())
+    const text = plain(lines).join('\n')
+    expect(text).toContain('DEEPSEEK_API_KEY')
+    expect(text).toContain('/key')
+    expect(text.indexOf('Tips')).toBeLessThan(text.indexOf('API Key'))
   })
 
   it('宽度守恒：92–140 全扫', () => {

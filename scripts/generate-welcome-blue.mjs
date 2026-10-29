@@ -204,6 +204,8 @@ const palette = paletteRaw.map((c, i) => {
   if (!LIFT_ENABLED || i >= blues.length) return c
   return lum(c) < LIFT_FLOOR ? c.map((v) => Math.min(255, Math.round(v * LIFT_FACTOR))) : c
 })
+// 仅覆盖发射主蓝；paletteRaw 与最近邻像素归类保持原图锚色不变。
+palette[blues.length + 4] = [0x4d, 0x6b, 0xfe]
 console.log('调色板:', palette.map(hex).join(' '))
 
 // 每像素 → 最近调色板色（1–F）；掩码透明 → 0

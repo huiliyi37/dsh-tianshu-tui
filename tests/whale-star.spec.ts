@@ -1,7 +1,7 @@
 /**
  * 抱星鲸鱼像素画（format/whale-star.ts）— 纯渲染契约测试。
  *
- * - 降级矩阵：窄屏/矮屏/无色/legacy conhost（full 宽度档）均返回空数组
+ * - 降级与兼容：窄屏/矮屏/无色返回空数组；full 档横向成对采样出图
  * - 半块渲染：仅 ▀▄█ 与空格；每行 RESET 收尾；行尾不补空格
  * - 色深轨：≥2 走品牌 hex，1 走现场最近邻 ANSI16（调色板变更免维护）
  * - 宽度守恒：任何出画宽度下每行显示宽度 ≤ width，且整块水平居中
@@ -61,9 +61,12 @@ describe('formatStarWhaleLogo（降级矩阵）', () => {
     expect(formatStarWhaleLogo(input({ colorLevel: 0 }))).toEqual([])
   })
 
-  it('legacy conhost（ambiguous full 档，块字符按 2 列渲染）→ 空数组', () => {
+  it('legacy conhost（ambiguous full 档）→ 横向成对采样出图且宽度守恒', () => {
     process.env.RIVET_AMBIGUOUS_WIDTH = 'full'
-    expect(formatStarWhaleLogo(input())).toEqual([])
+    const lines = formatStarWhaleLogo(input())
+    expect(lines).toHaveLength(STAR_WHALE_ROWS)
+    expect(lines.some(line => /[▀▄█]/.test(line))).toBe(true)
+    for (const line of lines) expect(displayWidth(line)).toBeLessThanOrEqual(100)
   })
 
   it('门禁边界值恰好满足 → 出画', () => {
@@ -107,7 +110,7 @@ describe('formatStarWhaleLogo（半块渲染与宽度守恒）', () => {
     // 半块每格二色（▀ fg/bg），混色边格纯色锚值未必原样出现——断言色族有代表（逐通道 Δ ≤ 40）
     const anchors: [string, number, number, number][] = [
       ['星核心', 254, 245, 209],
-      ['星金', 254, 240, 172],
+      ['星金', 253, 230, 111],
       ['光晕粉', 200, 123, 213],
       ['白肚', 190, 197, 250],
       ['身体紫', 158, 57, 245],
@@ -122,10 +125,12 @@ describe('formatStarWhaleLogo（半块渲染与宽度守恒）', () => {
 })
 
 describe('formatStarWhaleLogo（色深轨）', () => {
-  it('level 3：品牌 hex 走 truecolor（38;2），身体紫罗兰 #9e39f5', () => {
+  it('level 3：星金改为 #fde66f，深阴影与星核 #fef5d1 保持不变', () => {
     const joined = formatStarWhaleLogo(input({ colorLevel: 3 })).join('\n')
     expect(joined).toContain('\x1B[38;2;')
-    expect(joined).toContain('158;57;245')
+    expect(joined).toContain('253;230;111')
+    expect(joined).toContain('39;29;76')
+    expect(joined).toContain('254;245;209')
   })
 
   it('level 2：现场量化为 xterm-256（38;5）', () => {

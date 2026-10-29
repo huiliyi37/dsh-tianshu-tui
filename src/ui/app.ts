@@ -232,7 +232,7 @@ import { BtwController } from '../controllers/btw-controller.js'
 import { resumeModelSelection } from '../controllers/session-manager.js'
 import { InspectSurfaceController } from '../controllers/inspect-surface.js'
 import { renderBtwPanel } from '../format/btw-panel.js'
-import { CHROME_GUTTER, formatBlueWelcomeHero, formatStarWelcomeHero, formatWelcomeHero, type WelcomeEnvCheck, type WelcomeTipItem } from '../format/welcome.js'
+import { CHROME_GUTTER, WELCOME_TIPS_MAX_ITEMS, formatBlueWelcomeHero, formatCompactWelcomeHero, formatStarWelcomeHero, formatWelcomeHero, type WelcomeEnvCheck, type WelcomeTipItem } from '../format/welcome.js'
 import { formatWhaleLogo, WHALE_MIN_ROWS } from '../format/whale.js'
 import { formatStarWhaleLogo } from '../format/whale-star.js'
 import { formatBlueWhaleLogo } from '../format/whale-blue.js'
@@ -1914,7 +1914,7 @@ export class TuiApp {
     const summaries = await listSessions(this.ctx)
     const others = summaries.filter(s => s.id !== active)
 
-    // 环境检查结果：唯一来源（首启与有会话统一一行，不重复渲染）。
+    // 环境检查结果：唯一来源（首启与有会话统一一处，不重复渲染）。
     const env: WelcomeEnvCheck = {
       hasApiKey: this.apiKeyReady,
       isGitRepo: isGitRepo(),
@@ -1928,37 +1928,31 @@ export class TuiApp {
       ? '恢复会话'
       : `恢复 · ${formatSessionAge(recent.createdAt, Date.now())}`
 
-    // 品牌鲸鱼像素画（窄屏/矮屏/低色深/legacy conhost 时降级为纯文字品牌区）。
     const whale = formatWhaleLogo({ width: cols, rows: this.stdout.rows })
 
     // 顶栏与欢迎之间留 1 行。live overlay 不再填剩余视口。
     commitLine('')
 
     const tips: WelcomeTipItem[] = []
-    // 首次运行 onboarding：欢迎页一次性引导（/help 命令帮助面板），展示后
-    // 写 prefs.onboarded 落盘，之后启动不再重复。VITEST（prefsPath null）下
-    // 不落盘、恒展示（测试密封）。
+    // 环境待办优先：API key 缺失是硬阻塞，排最前引导（/key 配置密钥）。
+    if (!this.apiKeyReady) tips.push({ keyHint: '/key', label: '配置 API key' })
+    // 首次运行 onboarding 排第二；展示后写 prefs.onboarded 落盘。VITEST
+    // （prefsPath null）下不落盘、恒展示（测试密封）。
     if (this.prefs.onboarded !== true) {
       tips.push({ keyHint: '/help', label: '命令帮助面板' })
       this.prefs.onboarded = true
       this.persistPrefs()
-    }
-    // 环境待办优先：API key 缺失是硬阻塞，排最前引导（/key 配置密钥）。
-    if (!this.apiKeyReady) {
-      tips.push({ keyHint: '/key', label: '配置 API key' })
     }
     tips.push(
       { keyHint: 'ctrl+n', label: '新会话' },
       { keyHint: 'ctrl+s', label: resumeLabel, available: resumeAvailable },
       { keyHint: 'ctrl+p', label: '命令面板' },
       { keyHint: '/', label: 'slash 命令' },
-      { keyHint: 'ctrl+o', label: '展开推理' },
-      { keyHint: 'shift+tab', label: '模式循环' },
     )
+    tips.length = Math.min(tips.length, WELCOME_TIPS_MAX_ITEMS)
     const ownVersion = readOwnVersion(fileURLToPath(new URL('.', import.meta.url)))
-    // 欢迎页风格分流（prefs.welcomeStyle，缺省 blue）：blue = 蓝鲸抱星 +
-    // ANSI Shadow 艺术字标题块；star = 紫鲸举星 + 艺术字标题块；
-    // 门禁不满足（窄/矮/无色/full 档）或 retro 配置 → 现行为。
+    // 欢迎页风格分流（prefs.welcomeStyle，缺省 blue）：blue/star 先尝试双列
+    // 像素 hero；门禁不满足时使用紧凑单列文字块。显式 retro 保持旧布局。
     let hero: string[] = []
     const welcomeStyle = this.prefs.welcomeStyle ?? 'blue'
     if (welcomeStyle === 'blue') {
@@ -1983,7 +1977,10 @@ export class TuiApp {
       }, this.theme)
     }
     if (hero.length === 0) {
-      hero = formatWelcomeHero({ width: cols, whale, env, tips, ...(ownVersion === undefined ? {} : { version: ownVersion }) }, this.theme)
+      const input = { width: cols, env, tips, ...(ownVersion === undefined ? {} : { version: ownVersion }) }
+      hero = welcomeStyle === 'retro'
+        ? formatWelcomeHero({ ...input, whale }, this.theme)
+        : formatCompactWelcomeHero(input, this.theme)
     }
     for (const line of hero) {
       commitLine(line)
