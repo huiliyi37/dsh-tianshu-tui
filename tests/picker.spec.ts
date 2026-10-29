@@ -15,6 +15,7 @@ import {
   type PickerItem,
 } from '../src/picker.js'
 import type { RivetTheme } from '../src/theme.js'
+import { buildProviderItems } from '../src/ui/key-wizard.js'
 
 function fakeTheme(): RivetTheme {
   return {
@@ -73,6 +74,16 @@ describe('renderPicker', () => {
     const rows = plain(renderPicker(state, items, 60, 10, fakeTheme()))
     expect(rows[1]).toBe('  graphite ●')
     expect(rows[3]).toBe('▶ ocean')
+  })
+
+  it('只读账号 header 仍显示默认 ●', () => {
+    const accountItems = buildProviderItems([{
+      provider: 'deepseek-account', displayName: 'DeepSeek Account',
+      settingsNs: 'llm-deepseek-account', settingsPath: [], accountAvailable: true,
+    }], new Map(), 'deepseek-account')
+    const rows = plain(renderPicker({ open: true, selected: 0, title: 't' }, accountItems, 80, 10, fakeTheme()))
+    expect(accountItems[0]?.header).toBe(true)
+    expect(rows[1]).toBe('DeepSeek Account（已登录，无需 API Key） ●')
   })
 
   it('空条目 → 无选项占位', () => {

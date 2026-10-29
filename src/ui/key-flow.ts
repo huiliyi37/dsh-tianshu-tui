@@ -4,9 +4,8 @@
  * 实例私有方法；本仓按棘轮约束（ui/app.ts 只降不升）提取为独立模块，
  * TuiApp 仅保留 deps 注入与 overlay 注册。
  *
- * 分层：key-wizard（纯函数目录/引用决策）→ key-dialog（状态机+渲染）→
- * 本模块（装配：reflect 现取 llm/credentials/settings seam、供应商 picker
- * 链式开窗、探测分派、保存后 profile 激活、首启引导）。
+ * 分层：key-wizard（目录/引用决策）→ key-dialog/provider-editor（状态机+渲染）→
+ * 本模块（供应商 picker 与 key 装配）；pi-ai 完整 profile 由 provider-flow 负责。
  *
  * @module dsh-tui/key-flow
  */
@@ -21,6 +20,7 @@ import {
   type KeyDialogTarget,
 } from './key-dialog.js'
 import { buildProviderItems, resolveKeyRef, type WizardProviderEntry } from './key-wizard.js'
+import type { ProviderFlow } from './provider-flow.js'
 
 /** ctx.reflect 的最小面（结构兼容 cordis reflect；key-flow 只消费 get）。 */
 export interface KeyFlowReflect {
@@ -29,7 +29,7 @@ export interface KeyFlowReflect {
 
 /** settings 服务最小面（describe/mutate；缺席时向导只存 key 不做 profile 激活）。 */
 export interface KeyWizardSettingsFacet {
-  describe(options?: { redactSecrets?: boolean }): Array<{ ns: string; value: unknown }>
+  describe(options?: { redactSecrets?: boolean }): Array<{ ns: string; value: unknown; user?: unknown }>
   mutate(ns: string, ops: Array<{ op: string; path: readonly string[]; value: unknown }>): Promise<void>
 }
 
@@ -38,6 +38,8 @@ export interface KeyFlowDeps {
   overlay: OverlayController | null
   picker: PickerController | null
   keyDialog: KeyDialogController | null
+  /** pi-ai 完整 provider 编辑器；缺省保持原 key-only 装配。 */
+  providerFlow?: ProviderFlow
   reflect: KeyFlowReflect
   isDisposed: () => boolean
   /** 首启引导：标准输入是否 TTY（非 TTY 不弹交互对话框）。 */
@@ -69,10 +71,9 @@ export class KeyFlow {
   }
 
   /**
-   * /key：供应商密钥配置向导。llm 配置目录可用时先开供应商 picker（默认
-   * 供应商 ● 置首、已配置 ✓ 后缀），选中后链到参数化的 key 对话框（掩码
-   * 输入 + 探测 + 落盘）；目录缺席（无 llm seam/测试装配）降级为 DeepSeek
-   * 直开。凭据服务经 reflect.get 现取（缺席时对话框给降级指引）。
+   * /key：供应商配置向导。目录可用时先开 picker；pi-ai 进入完整 provider
+   * 编辑器（settings 不可用时回退 key-only），其余进入参数化 key 对话框。
+   * 目录缺席降级 DeepSeek 直开，凭据服务缺席时给降级指引。
    */
   async openKeyDialog(): Promise<void> {
     const { overlay, keyDialog, picker } = this.deps
@@ -87,24 +88,56 @@ export class KeyFlow {
       await this.openKeyDialogForEntry(undefined, credentials)
       return
     }
-    // 状态 join：各条目的落盘引用 + credentials.describe（configured）。
+    // 状态 join：只有未自定义覆盖的官方别名允许归并；账号可用性只看模型目录。
     const sections = this.readResolvedSettingsSections()
+    const userSections = this.readUserSettingsSections()
+    const accountAvailable = await this.deepSeekAccountAvailable(directory)
+    if (this.deps.isDisposed()) return
+    const presentation = directory.map(entry => {
+      const officialAlias = this.officialDeepSeekAlias(userSections, entry)
+      return {
+        ...entry,
+        keyRef: resolveKeyRef(entry.provider, this.profileApiKeyEnv(sections, entry)),
+        ...officialAlias === undefined ? {} : { officialAlias },
+        ...entry.provider === 'deepseek-account' ? { accountAvailable } : {},
+      }
+    })
     const configured = new Map<string, boolean>()
-    for (const entry of directory) {
-      const ref = resolveKeyRef(entry.provider, this.profileApiKeyEnv(sections, entry))
+    for (const entry of presentation) {
+      if (entry.provider === 'deepseek-account') continue
       if (credentials === undefined) break
-      const isConfigured = await credentials.describe(ref)
+      const isConfigured = await credentials.describe(entry.keyRef)
         .then(info => info.configured, () => false)
       if (this.deps.isDisposed()) return
       configured.set(entry.provider, isConfigured)
     }
     const defaultProvider = this.defaultModelProvider()
-    picker.open('选择供应商（配置 API 密钥）', buildProviderItems(directory, configured, defaultProvider), (item) => {
+    const providerFlow = this.deps.providerFlow
+    const createItem = '\0create-pi-ai'
+    const items = buildProviderItems(presentation, configured, defaultProvider)
+    if (providerFlow !== undefined && directory.some(entry => entry.settingsNs === 'llm-pi-ai')) {
+      items.push({ label: '＋ 新增自定义 pi-ai 供应商…', value: createItem })
+    }
+    const title = providerFlow === undefined ? '选择供应商（配置 API 密钥）' : '选择供应商（API 密钥 / 自定义接入）'
+    picker.open(title, items, (item) => {
       const entry = directory.find(candidate => candidate.provider === item.value)
-      if (entry === undefined) return
+      if (entry === undefined) {
+        if (item.value === createItem && providerFlow !== undefined) {
+          queueMicrotask(() => { void providerFlow.openCreate() })
+        }
+        return
+      }
+      // 宿主允许任意非空 provider id：真实目录条目优先于创建 sentinel。
       // picker 的 commit 回调先于随后的 overlay.deactivate：链式开窗必须排到
       // picker 失活之后（微任务），否则 activate 会被紧跟的 deactivate 打掉。
-      queueMicrotask(() => { void this.openKeyDialogForEntry(entry, credentials) })
+      queueMicrotask(() => {
+        const fallback = () => { void this.openKeyDialogForEntry(entry, credentials) }
+        if (entry.settingsNs !== 'llm-pi-ai' || providerFlow === undefined) {
+          fallback()
+          return
+        }
+        void providerFlow.openEdit(entry).then(opened => { if (!opened) fallback() }, fallback)
+      })
     }, 0)
     overlay.activate('picker')
   }
@@ -124,6 +157,7 @@ export class KeyFlow {
     const { overlay, keyDialog } = this.deps
     if (this.deps.isDisposed()) return
     if (overlay === null || keyDialog === null) return
+    if (entry?.provider === 'deepseek-account') return
     if (overlay.activeId() === 'key-dialog') return
     const sections = this.readResolvedSettingsSections()
     const namedEnv = entry === undefined ? undefined : this.profileApiKeyEnv(sections, entry)
@@ -133,7 +167,7 @@ export class KeyFlow {
         provider: entry.provider,
         displayName: entry.displayName,
         ref: resolveKeyRef(entry.provider, namedEnv),
-        probe: this.keyProbeFor(entry),
+        probe: this.keyProbeFor(entry, sections),
         ...namedEnv === undefined
           && entry.settingsPath.length > 0
           && this.settingsMutationFacet() !== undefined
@@ -147,13 +181,14 @@ export class KeyFlow {
 
   /**
    * 凭据字段编辑：从 /config 进该供应商的 /key 对话框（向导后段）。
-   * 目录中找不到该供应商（目录已变更）时走 onConfigEntryMissing 回调。
+   * 目录中找不到该供应商（目录已变更）或路由不使用 API Key 时走
+   * onConfigEntryMissing 回调。
    * @param provider - 供应商路由 id。
    */
   async openCredentialFromConfig(provider: string): Promise<void> {
     const entry = this.keyWizardDirectory().find(candidate => candidate.provider === provider)
     const credentials = this.deps.reflect.get('credentials', false) as KeyDialogCredentials | undefined
-    if (entry === undefined) {
+    if (entry === undefined || entry.provider === 'deepseek-account') {
       this.deps.onConfigEntryMissing?.()
       return
     }
@@ -183,6 +218,9 @@ export class KeyFlow {
           displayName: string
           settingsNs: string
           settingsPath: readonly string[]
+          declared?: boolean
+          defaultBaseURL?: string
+          baseURLEnv?: readonly string[]
         }>
       }
       | undefined
@@ -194,6 +232,9 @@ export class KeyFlow {
         displayName: entry.displayName,
         settingsNs: entry.settingsNs,
         settingsPath: entry.settingsPath,
+        ...entry.declared === undefined ? {} : { declared: entry.declared },
+        ...entry.defaultBaseURL === undefined ? {} : { defaultBaseURL: entry.defaultBaseURL },
+        ...entry.baseURLEnv === undefined ? {} : { baseURLEnv: entry.baseURLEnv },
       }))
   }
 
@@ -204,17 +245,38 @@ export class KeyFlow {
 
   /** 读取 settings 各命名空间的已解析值（ns 对象原样保留供 mutate 回传）。 */
   readResolvedSettingsSections(): Map<string, unknown> {
+    return this.readSettingsSections('value') ?? new Map()
+  }
+
+  /** 读取原始用户层；字段是否由用户覆盖只能在这一层判断，不能看 resolved 默认值。 */
+  readUserSettingsSections(): Map<string, unknown> | undefined {
+    return this.readSettingsSections('user')
+  }
+
+  private readSettingsSections(layer: 'value' | 'user'): Map<string, unknown> | undefined {
     const sections = new Map<string, unknown>()
     const settings = this.settingsMutationFacet()
-    if (settings === undefined) return sections
+    if (settings === undefined) return undefined
     try {
       for (const descriptor of settings.describe()) {
-        sections.set(String(descriptor.ns), descriptor.value)
+        const value = descriptor[layer]
+        if (value !== undefined) sections.set(String(descriptor.ns), value)
       }
     } catch {
-      // 面不匹配/读取失败：引用解析退回派生规则（最早的可用事实）。
+      return undefined
     }
     return sections
+  }
+
+  private profileValue(sections: ReadonlyMap<string, unknown>, entry: WizardProviderEntry): unknown {
+    const section = sections.get(entry.settingsNs)
+    if (section === null || typeof section !== 'object') return undefined
+    let profile: unknown = section
+    for (const key of entry.settingsPath) {
+      if (profile === null || typeof profile !== 'object') return undefined
+      profile = (profile as Record<string, unknown>)[key]
+    }
+    return profile
   }
 
   /**
@@ -223,33 +285,78 @@ export class KeyFlow {
    * 为 DEEPSEEK_API_KEY。无 profile/未声明返回 undefined（落派生规则）。
    */
   profileApiKeyEnv(sections: ReadonlyMap<string, unknown>, entry: WizardProviderEntry): string | undefined {
-    const section = sections.get(entry.settingsNs)
-    if (section === null || typeof section !== 'object') return undefined
-    let profile: unknown = section
-    for (const key of entry.settingsPath) {
-      if (profile === null || typeof profile !== 'object') return undefined
-      profile = (profile as Record<string, unknown>)[key]
+    return this.profileString(sections, entry, 'apiKeyEnv')
+  }
+
+  private profileString(
+    sections: ReadonlyMap<string, unknown>,
+    entry: WizardProviderEntry,
+    key: string,
+  ): string | undefined {
+    const profile = this.profileValue(sections, entry)
+    if (profile === null || typeof profile !== 'object') return undefined
+    const value = (profile as Record<string, unknown>)[key]
+    return typeof value === 'string' && value.length > 0 ? value : undefined
+  }
+
+  /** 仅官方 API Key 与未覆盖路由语义的内置 pi-ai deepseek 构成别名。 */
+  private officialDeepSeekAlias(
+    userSections: ReadonlyMap<string, unknown> | undefined,
+    entry: WizardProviderEntry,
+  ): 'deepseek' | undefined {
+    if (userSections === undefined || this.settingsMutationFacet() === undefined) return undefined
+    const official = entry.provider === 'deepseek-official'
+      && entry.settingsNs === 'llm-deepseek'
+      && entry.settingsPath.length === 0
+    const catalog = entry.provider === 'deepseek'
+      && entry.settingsNs === 'llm-pi-ai'
+      && entry.declared === false
+      && entry.settingsPath.length === 2
+      && entry.settingsPath[0] === 'providers'
+      && entry.settingsPath[1] === 'deepseek'
+    if (!official && !catalog) return undefined
+    const profile = this.profileValue(userSections, entry)
+    if (profile === undefined) return 'deepseek'
+    if (profile === null || typeof profile !== 'object' || Array.isArray(profile)) return undefined
+    for (const key of Object.keys(profile)) {
+      if (key !== 'apiKeyEnv') return undefined
     }
-    const named = profile === null || typeof profile !== 'object'
-      ? undefined
-      : (profile as Record<string, unknown>).apiKeyEnv
-    return typeof named === 'string' && named.length > 0 ? named : undefined
+    return 'deepseek'
   }
 
   /**
-   * 供应商探测实现：llm-deepseek 段用既有官方端点探测；其余走 llm 发现探针
-   * （带草稿 key 即真鉴权：2xx → ok，AUTH/INVALID_CREDENTIAL → invalid，
-   * 其余含网络错 → unknown）。llm seam 缺席按 unknown（无法证伪，可强存）。
+   * 供应商探测实现：llm-deepseek 段用既有官方端点探测。pi-ai catalog 的
+   * discoverModels 会本地短路，不能证明 key 有效，直接 unknown；declared
+   * 自定义路由携带草稿 baseURL/api 走真实端点发现，成功才 ok。
    */
-  private keyProbeFor(entry: WizardProviderEntry): (key: string) => Promise<'ok' | 'invalid' | 'unknown'> {
+  private keyProbeFor(
+    entry: WizardProviderEntry,
+    sections: ReadonlyMap<string, unknown>,
+  ): (key: string) => Promise<'ok' | 'invalid' | 'unknown'> {
     if (entry.settingsNs === 'llm-deepseek') return probeDeepSeekKey
     return async (key) => {
+      if (entry.settingsNs === 'llm-pi-ai' && entry.declared === false) return 'unknown'
       const llm = this.deps.reflect.get('llm', false) as
-        | { discoverModels?: (ns: string, request: { provider?: string; apiKey?: string }) => Promise<unknown> }
+        | {
+          discoverModels?: (
+            ns: string,
+            request: { provider?: string; apiKey?: string; baseURL?: string; api?: string },
+          ) => Promise<unknown>
+        }
         | undefined
       if (llm === undefined || typeof llm.discoverModels !== 'function') return 'unknown'
+      const request: { provider: string; apiKey: string; baseURL?: string; api?: string } = {
+        provider: entry.provider,
+        apiKey: key,
+      }
+      if (entry.settingsNs === 'llm-pi-ai' && entry.declared === true) {
+        const baseURL = this.profileString(sections, entry, 'baseURL') ?? entry.defaultBaseURL
+        const api = this.profileString(sections, entry, 'api')
+        if (baseURL !== undefined) request.baseURL = baseURL
+        if (api !== undefined) request.api = api
+      }
       try {
-        await llm.discoverModels(entry.settingsNs, { provider: entry.provider, apiKey: key })
+        await llm.discoverModels(entry.settingsNs, request)
         return 'ok'
       } catch (error) {
         const code = (error as { code?: unknown }).code
@@ -267,6 +374,34 @@ export class KeyFlow {
       path: [...entry.settingsPath, 'apiKeyEnv'],
       value: resolveKeyRef(entry.provider, undefined),
     }])
+  }
+
+  /** 当前 base 无 sessionController；按官方 groups 的 llm 数据源判定账号组非空。 */
+  private async deepSeekAccountAvailable(directory: readonly WizardProviderEntry[]): Promise<boolean> {
+    if (!directory.some(entry => entry.provider === 'deepseek-account')) return false
+    const llm = this.deps.reflect.get('llm', false) as
+      | {
+        listProviders?: () => readonly { id: string }[]
+        listModels?: (provider: string) => Promise<readonly { id: string }[]>
+        resolveModelInfo?: (provider: string, model: string) => Promise<unknown>
+      }
+      | undefined
+    if (llm === undefined
+      || typeof llm.listProviders !== 'function'
+      || typeof llm.listModels !== 'function'
+      || typeof llm.resolveModelInfo !== 'function') return false
+    const listProviders = llm.listProviders.bind(llm)
+    const listModels = llm.listModels.bind(llm)
+    const resolveModelInfo = llm.resolveModelInfo.bind(llm)
+    try {
+      if (!listProviders().some(provider => provider.id === 'deepseek-account')) return false
+      const models = await listModels('deepseek-account')
+      if (models.length === 0) return false
+      await Promise.all(models.map(model => resolveModelInfo('deepseek-account', model.id)))
+      return true
+    } catch {
+      return false
+    }
   }
 
   /** 当前默认模型所在的供应商路由（agent-default-model 缺席时无默认）。 */

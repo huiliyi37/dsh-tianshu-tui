@@ -80,10 +80,14 @@ export async function readImageFromClipboard(): Promise<ClipboardImage | null> {
 
 /**
  * 读系统剪贴板文本（Ctrl+V 无图时的 fallback；部分终端不经 bracketed paste
- * 传递粘贴文本）。各平台优先 pbpaste / wl-paste / xclip / PowerShell。
+ * 传递粘贴文本）。各平台优先 pbpaste / wl-paste / xclip / PowerShell；
+ * Linux 最后尝试 powershell.exe，覆盖 WSL 的 Windows 剪贴板。
+ * @param opts - 可选 shell 注入参数（缺省用真实 execFile/平台）
  * @returns 剪贴板文本；无工具或失败时 null
  */
-export async function readTextFromClipboard(): Promise<string | null> {
+export async function readTextFromClipboard(
+  opts?: Pick<ShellClipboardOpts, 'execFile' | 'platform'>,
+): Promise<string | null> {
   // 注入路径优先（与 readImageFromClipboard 同款）——测试不落真实剪贴板工具
   if (_reader?.readText) {
     try {
@@ -92,24 +96,35 @@ export async function readTextFromClipboard(): Promise<string | null> {
       return null
     }
   }
-  const pf = process.platform
+  const ef = opts?.execFile ?? (async (bin, args) => {
+    const r = await execFileAsync(bin, args, { timeout: 5_000, maxBuffer: 1024 * 1024, windowsHide: true })
+    return { stdout: r.stdout, stderr: r.stderr }
+  })
+  const pf = opts?.platform ?? process.platform
   try {
     if (pf === 'darwin') {
-      const r = await execFileAsync('pbpaste', [], { timeout: 5_000, maxBuffer: 1024 * 1024, windowsHide: true })
+      const r = await ef('pbpaste', [])
       return r.stdout
     }
     if (pf === 'linux') {
-      // Wayland 优先（wl-paste），X11 fallback（xclip）
-      try {
-        const r = await execFileAsync('wl-paste', [], { timeout: 5_000, maxBuffer: 1024 * 1024, windowsHide: true })
-        return r.stdout
-      } catch {
-        const r = await execFileAsync('xclip', ['-selection', 'clipboard', '-o'], { timeout: 5_000, maxBuffer: 1024 * 1024, windowsHide: true })
-        return r.stdout
+      // Wayland → X11 → WSL Windows 剪贴板；普通 Linux 无后者时同样安全降级。
+      const commands: [string, string[]][] = [
+        ['wl-paste', []],
+        ['xclip', ['-selection', 'clipboard', '-o']],
+        ['powershell.exe', ['-NoProfile', '-Command', 'Get-Clipboard']],
+      ]
+      for (const [bin, args] of commands) {
+        try {
+          const r = await ef(bin, args)
+          return r.stdout
+        } catch {
+          // 尝试下一条命令
+        }
       }
+      return null
     }
     if (pf === 'win32') {
-      const r = await execFileAsync('powershell', ['-NoProfile', '-Command', 'Get-Clipboard'], { timeout: 5_000, maxBuffer: 1024 * 1024, windowsHide: true })
+      const r = await ef('powershell', ['-NoProfile', '-Command', 'Get-Clipboard'])
       return r.stdout
     }
   } catch {

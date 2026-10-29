@@ -57,4 +57,82 @@ describe('buildProviderItems', () => {
     expect(items.map(item => item.value)).toEqual(['deepseek-official', 'openrouter', 'anthropic'])
     expect(items.every(item => item.current !== true)).toBe(true)
   })
+
+  it('仅明确官方 DeepSeek 别名归并；同名同 key 的 proxy 独立且 configured 保留 ✓', () => {
+    const duplicates: WizardProviderEntry[] = [
+      { ...directory[0]!, keyRef: 'DEEPSEEK_API_KEY', officialAlias: 'deepseek' },
+      {
+        provider: 'deepseek', displayName: 'deepseek', settingsNs: 'llm-pi-ai',
+        settingsPath: ['providers', 'deepseek'], keyRef: 'DEEPSEEK_API_KEY', officialAlias: 'deepseek',
+      },
+      {
+        provider: 'deepseek-proxy', displayName: 'DeepSeek', settingsNs: 'llm-pi-ai',
+        settingsPath: ['providers', 'deepseek-proxy'], keyRef: 'DEEPSEEK_API_KEY', declared: true,
+      },
+      directory[1]!,
+    ]
+    const items = buildProviderItems(duplicates, new Map([['deepseek', true]]), undefined)
+    expect(items).toEqual([
+      { label: 'DeepSeek ✓', value: 'deepseek-official' },
+      { label: 'DeepSeek', value: 'deepseek-proxy' },
+      { label: 'openrouter', value: 'openrouter' },
+    ])
+  })
+
+  it('分组同时约束 family 与认证引用，不按显示名字符串误删不同 adapter', () => {
+    const entries: WizardProviderEntry[] = [
+      { ...directory[0]!, keyRef: 'DEEPSEEK_API_KEY' },
+      {
+        provider: 'deepseek-custom', displayName: 'deepseek', settingsNs: 'llm-pi-ai',
+        settingsPath: ['providers', 'deepseek-custom'], keyRef: 'DEEPSEEK_CUSTOM_API_KEY',
+      },
+      {
+        provider: 'moonshotai', displayName: 'Moonshot', settingsNs: 'llm-pi-ai',
+        settingsPath: ['providers', 'moonshotai'], keyRef: 'MOONSHOT_API_KEY',
+      },
+      {
+        provider: 'moonshotai-cn', displayName: 'Moonshot CN', settingsNs: 'llm-pi-ai',
+        settingsPath: ['providers', 'moonshotai-cn'], keyRef: 'MOONSHOT_API_KEY',
+      },
+    ]
+    expect(buildProviderItems(entries, new Map(), undefined).map(item => item.value))
+      .toEqual(['deepseek-official', 'deepseek-custom', 'moonshotai', 'moonshotai-cn'])
+  })
+
+  it('deepseek-account 未证明可用（false 或未知）时过滤', () => {
+    const account: WizardProviderEntry = {
+      provider: 'deepseek-account', displayName: 'DeepSeek Account',
+      settingsNs: 'llm-deepseek-account', settingsPath: [],
+    }
+    expect(buildProviderItems([account, directory[0]!], new Map(), undefined))
+      .toEqual([{ label: 'DeepSeek', value: 'deepseek-official' }])
+    expect(buildProviderItems([{ ...account, accountAvailable: false }, directory[0]!], new Map(), undefined))
+      .toEqual([{ label: 'DeepSeek', value: 'deepseek-official' }])
+  })
+
+  it('deepseek-account 有非空模型组时只显示不可提交的登录状态', () => {
+    const account: WizardProviderEntry = {
+      provider: 'deepseek-account', displayName: 'DeepSeek Account',
+      settingsNs: 'llm-deepseek-account', settingsPath: [], accountAvailable: true,
+    }
+    expect(buildProviderItems([account, directory[0]!], new Map(), undefined)).toEqual([
+      { label: 'DeepSeek Account（已登录，无需 API Key）', value: 'deepseek-account', header: true },
+      { label: 'DeepSeek', value: 'deepseek-official' },
+    ])
+  })
+
+  it('默认路由位于重复组时由默认项代表该组并置首', () => {
+    const duplicates: WizardProviderEntry[] = [
+      { ...directory[0]!, keyRef: 'DEEPSEEK_API_KEY', officialAlias: 'deepseek' },
+      {
+        provider: 'deepseek', displayName: 'deepseek', settingsNs: 'llm-pi-ai',
+        settingsPath: ['providers', 'deepseek'], keyRef: 'DEEPSEEK_API_KEY', officialAlias: 'deepseek',
+      },
+      directory[1]!,
+    ]
+    expect(buildProviderItems(duplicates, new Map(), 'deepseek')).toEqual([
+      { label: 'deepseek', value: 'deepseek', current: true },
+      { label: 'openrouter', value: 'openrouter' },
+    ])
+  })
 })

@@ -4,8 +4,8 @@
  * 原 TuiApp.handleKey 里六段 overlay 分支的表驱动化：各 overlay 自持
  * handleKey（统一返回词表 'close'|'handled'，Esc/Ctrl+C 关闭判定在类内），
  * 本路由器只做「activeId → 键目标」委派与结果收尾（close → deactivate、
- * handled → rerender）。委派顺序对齐原 if 链：key-dialog（Ctrl+V 粘贴拦截
- * 在先）→ picker → search → scroll → rewind → memory → palette（以 isOpen
+ * handled → rerender）。委派顺序对齐原 if 链：key-dialog/provider-editor
+ * （Ctrl+V 粘贴拦截在先）→ picker → search → scroll → rewind → memory → palette（以 isOpen
  * 判定；commit 分流 execute 直接执行 / backfill 回填输入行）。
  *
  * 键目标缺席（控制器未装配）时不吞键、落后续路由——对齐原分支条件
@@ -21,6 +21,7 @@ import type { OverlayId, OverlayKeyResult } from '../engine/overlay-engine.js'
 import type { CommandPalette } from '../command-palette.js'
 import type { PickerController } from '../picker.js'
 import type { KeyDialogController } from '../ui/key-dialog.js'
+import type { ProviderEditorController } from '../ui/provider-editor.js'
 import type { HistorySearchOverlay } from '../format/history-search-overlay.js'
 import type { ScrollPagerOverlay } from '../format/scroll-pager-overlay.js'
 import type { RewindOverlay } from '../format/rewind-overlay.js'
@@ -35,14 +36,16 @@ export interface OverlayKeyTarget {
 export interface OverlayKeyRouterDeps {
   overlay(): OverlayController | null
   keyDialog(): KeyDialogController | null
+  providerEditor(): ProviderEditorController | null
   picker(): PickerController | null
   search(): HistorySearchOverlay | null
   scroll(): ScrollPagerOverlay | null
   rewind(): RewindOverlay | null
   memory(): MemoryBrowserOverlay | null
   palette(): CommandPalette | null
-  /** /key 对话框 Ctrl+V：读剪贴板文本进 Key 字段（异步；内部 rerender）。 */
+  /** 文本 overlay Ctrl+V：读剪贴板文本进当前字段（异步；内部 rerender）。 */
   pasteKeyDialog(dialog: KeyDialogController): void
+  pasteProviderEditor(editor: ProviderEditorController): void
   /** palette commit execute 模式分流：直接执行 `/name`（TuiApp.handleSubmit）。 */
   submit(text: string): void
   /** palette commit backfill 模式分流：回填 `/name ` 到输入行。 */
@@ -84,6 +87,14 @@ export class OverlayKeyRouter {
         if (dialog !== null) {
           if (key.name === 'ctrl_v') this.deps.pasteKeyDialog(dialog)
           else this.closeOrRerender(overlay, dialog.handleKey(key.name, key.char))
+          return true
+        }
+      }
+      if (active === 'provider-editor') {
+        const editor = this.deps.providerEditor()
+        if (editor !== null) {
+          if (key.name === 'ctrl_v') this.deps.pasteProviderEditor(editor)
+          else this.closeOrRerender(overlay, editor.handleKey(key.name, key.char))
           return true
         }
       }

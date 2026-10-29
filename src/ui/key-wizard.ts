@@ -19,6 +19,18 @@ export interface WizardProviderEntry {
   settingsNs: string
   /** 命名空间段根到 profile 对象的路径（空 = 整段即 profile）。 */
   settingsPath: readonly string[]
+  /** 是否为宿主内置 catalog 之外的手写路由。 */
+  declared?: boolean
+  /** profile 未覆盖 baseURL 时 adapter 报告的缺省端点。 */
+  defaultBaseURL?: string
+  /** 构造缺省端点所读的环境变量（仅展示）。 */
+  baseURLEnv?: readonly string[]
+  /** 已解析的 API Key 引用；仅用于识别同认证路由，不改变落盘引用。 */
+  keyRef?: string
+  /** 装配方验证过的官方别名组；自定义或无法验证目录语义时缺省。 */
+  officialAlias?: 'deepseek'
+  /** 账号路由是否有可用模型；仅 deepseek-account 使用，缺省按不可用过滤。 */
+  accountAvailable?: boolean
 }
 
 /**
@@ -48,35 +60,69 @@ export function resolveKeyRef(provider: string, profileApiKeyEnv: string | undef
 }
 
 /**
- * 构建 /key 供应商 picker 条目：默认供应商置首带 ●（current），已配置 key
- * 的条目 label 后缀 ` ✓`（PickerItem 无描述行，状态内联进 label）；其余按
- * 目录声明序。空目录返回空数组（装配方负责降级文案）。
- * @param directory - 可配置供应商目录。
- * @param configured - 各供应商引用的 describe 结果（configured 标志）。
+ * 构建 /key 供应商 picker 条目。只有装配方明确验证过的官方别名且解析到
+ * 同一 keyRef 时才归并；其他路由即使同名同 key 也各自保留。默认供应商
+ * 所在组置首，并由默认路由本身代表该组（current）；已配置组带 ✓。
+ * deepseek-account 只在模型目录证明可用时显示为不可提交的登录状态行，
+ * 默认账号的 ● 直接写入 label，避免 header 渲染分支忽略 current。
+ * @param directory - 可配置供应商目录及展示期认证信息。
+ * @param configured - 各供应商的 credentials.describe configured 标志。
  * @param defaultProvider - 当前默认模型所在的供应商路由；undefined = 无默认不置首。
- * @returns picker 条目（value = 供应商路由 id）。
+ * @returns picker 条目（可选行 value = 供应商路由 id）。
  */
 export function buildProviderItems(
   directory: readonly WizardProviderEntry[],
   configured: ReadonlyMap<string, boolean>,
   defaultProvider: string | undefined,
 ): PickerItem[] {
-  const items: PickerItem[] = []
-  const defaultEntry = defaultProvider === undefined
+  const groups: WizardProviderEntry[][] = []
+  const officialAliasGroups = new Map<string, WizardProviderEntry[]>()
+  for (const entry of directory) {
+    if (entry.provider === 'deepseek-account') {
+      if (entry.accountAvailable === true) groups.push([entry])
+      continue
+    }
+    if (entry.officialAlias === undefined) {
+      groups.push([entry])
+      continue
+    }
+    const key = `${entry.officialAlias}\0${entry.keyRef ?? deriveKeyRef(entry.provider)}`
+    const group = officialAliasGroups.get(key)
+    if (group === undefined) {
+      const created = [entry]
+      officialAliasGroups.set(key, created)
+      groups.push(created)
+    } else {
+      group.push(entry)
+    }
+  }
+
+  const defaultGroup = defaultProvider === undefined
     ? undefined
-    : directory.find(entry => entry.provider === defaultProvider)
-  const emit = (entry: WizardProviderEntry, current: boolean): void => {
-    const suffix = configured.get(entry.provider) === true ? ' ✓' : ''
+    : groups.find(group => group.some(entry => entry.provider === defaultProvider))
+  const ordered = defaultGroup === undefined
+    ? groups
+    : [defaultGroup, ...groups.filter(group => group !== defaultGroup)]
+  const items: PickerItem[] = []
+  for (const group of ordered) {
+    const entry = group.find(candidate => candidate.provider === defaultProvider) ?? group[0]
+    if (entry === undefined) continue
+    const current = entry.provider === defaultProvider
+    if (entry.provider === 'deepseek-account') {
+      items.push({
+        label: `${entry.displayName}（已登录，无需 API Key）${current ? ' ●' : ''}`,
+        value: entry.provider,
+        header: true,
+        ...current ? { current: true } : {},
+      })
+      continue
+    }
+    const suffix = group.some(candidate => configured.get(candidate.provider) === true) ? ' ✓' : ''
     items.push({
       label: `${entry.displayName}${suffix}`,
       value: entry.provider,
       ...current ? { current: true } : {},
     })
-  }
-  if (defaultEntry !== undefined) emit(defaultEntry, true)
-  for (const entry of directory) {
-    if (entry === defaultEntry) continue
-    emit(entry, false)
   }
   return items
 }

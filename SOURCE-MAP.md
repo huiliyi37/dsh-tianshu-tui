@@ -198,6 +198,9 @@ Apache-2.0）；`service.ts`（LspService 封装）、`tools.ts`（三个模型�
 | src/ui/key-dialog.ts | ui/key-dialog.ts | ported（2026-08 回流：供应商 API Key 掩码输入对话框状态机） |
 | src/ui/key-flow.ts | — | new（装配提取层：上游 TuiApp 的 openKeyDialog 系列提取，棘轮对冲；key-wizard/key-dialog 之上） |
 | src/ui/key-wizard.ts | ui/key-wizard.ts | ported（2026-08 回流：/key 供应商选择纯函数层） |
+| src/ui/provider-profile.ts | — | new（pi-ai profile 草稿校验、apiKeyEnv 派生、最小 settings path ops 与模型候选采纳） |
+| src/ui/provider-editor.ts | — | new（自定义 pi-ai 多字段 overlay：模型发现/手输、绑定粘贴、两段保存与 key-only retry 状态机） |
+| src/ui/provider-flow.ts | — | new（pi-ai Host 装配：fail-closed 路由冲突检测、revision、settings→credentials 与草稿发现） |
 | src/ui/render.ts | — | new |
 | src/width.ts | width.ts | modified（+charDisplayWidth：单字符宽度两档有界缓存，输入框折行热路径专用，与 displayWidth 恒等） |
 | src/workflow-panel.ts | — | new |

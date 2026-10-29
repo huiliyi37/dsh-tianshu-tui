@@ -116,6 +116,8 @@ import { ErrorAnnouncer } from '../controllers/error-announcer.js'
 import { cancelAndSendInput, formatQueueLine, SubmitQueueController } from '../controllers/submit-queue.js'
 import { KeyDialogController } from './key-dialog.js'
 import { KeyFlow } from './key-flow.js'
+import { ProviderEditorController } from './provider-editor.js'
+import { ProviderFlow } from './provider-flow.js'
 import {
   projectQuestionPanel,
 } from '../question-panel.js'
@@ -510,6 +512,8 @@ export class TuiApp {
   private readonly submitQueue = new SubmitQueueController()
   /** /key、/login：API Key 设置对话框（掩码输入 + 联网验证 + 落盘）。 */
   private keyDialog: KeyDialogController | null = null
+  /** /key：pi-ai 自定义端点、模型目录与凭据编辑器。 */
+  private providerEditor: ProviderEditorController | null = null
   /** /key 供应商密钥配置装配层（key-wizard/key-dialog 之上；deps 注入 openKeyDialog）。 */
   private keyFlow!: KeyFlow
   /** /key 首启自动弹窗禁用（宿主/测试装配显式关闭；缺省 false=启用）。 */
@@ -532,7 +536,7 @@ export class TuiApp {
   private readonly menuKeys: BlockingKeyContext
   /** inspect 上下文键（轮询位置在 slash 菜单之后——现状顺序保持）。 */
   private readonly inspectKeys: BlockingKeyContext
-  /** overlay 键路由器（key-dialog/picker/search/scroll/rewind/memory/palette 委派）。 */
+  /** overlay 键路由器（key-dialog/provider-editor/picker/search/scroll/rewind/memory/palette 委派）。 */
   private readonly overlayRouter: OverlayKeyRouter
   /** footer 检查面板提示段（registry 构造期投影；审批段改由 renderLive 逐帧投影——p 段动态）。 */
   private readonly footerInspectHints: readonly string[]
@@ -726,6 +730,9 @@ export class TuiApp {
   private osc52WarningShown = false
   /** bracketed paste 处理器 disposer（attach 注册，dispose 释放）。 */
   private pasteDisposer: (() => void) | null = null
+  /** 文本 overlay 粘贴：进出代次防跨窗旧结果，操作序列防慢读乱序落地。 */
+  private overlayPasteEpoch = 0
+  private overlayPasteSequence = 0
   /**
    * 动态段高水位（display rows），跨轮保留。回缩会使输入框上跳，并把旧轨线
    * 留在空隙里（重影）。新会话 / 切会话时归零。
@@ -1274,13 +1281,15 @@ export class TuiApp {
     this.overlayRouter = new OverlayKeyRouter({
       overlay: () => this.overlay,
       keyDialog: () => this.keyDialog,
+      providerEditor: () => this.providerEditor,
       picker: () => this.picker,
       search: () => this.searchOverlay,
       scroll: () => this.scrollPager,
       rewind: () => this.rewindOverlay,
       memory: () => this.memoryOverlay,
       palette: () => this.palette,
-      pasteKeyDialog: dialog => { void this.pasteClipboardIntoKeyDialog(dialog) },
+      pasteKeyDialog: dialog => { void this.pasteClipboardIntoOverlay(dialog) },
+      pasteProviderEditor: editor => { void this.pasteClipboardIntoOverlay(editor) },
       submit: text => { this.handleSubmit(text) },
       backfill: text => { this.inputLine.setValue(text) },
     })
@@ -1447,6 +1456,7 @@ export class TuiApp {
       getSize: () => ({ cols: this.stdout.columns, rows: this.stdout.rows }),
       live: this.live,
       onOverlayChange: (active) => {
+        this.overlayPasteEpoch += 1
         if (active) return
         // 退出 alt screen 后：把 overlay 期间暂存的 scrollback 补写回主屏，
         // 再同步重绘 live 区（不能只等 120ms ticker——主屏刚恢复时 live 区是旧帧）。
@@ -1486,10 +1496,23 @@ export class TuiApp {
       onSaved: () => { void this.refreshApiKeyReady() },
     })
     this.overlay.register('key-dialog', this.keyDialog)
+    this.providerEditor = new ProviderEditorController({
+      getTheme: () => this.theme,
+      onChange: () => { this.overlay?.rerender() },
+    })
+    this.overlay.register('provider-editor', this.providerEditor)
+    const providerFlow = new ProviderFlow({
+      overlay: this.overlay,
+      editor: this.providerEditor,
+      reflect: this.ctx.reflect,
+      isDisposed: () => this.disposed,
+      onSaved: () => { void this.refreshApiKeyReady() },
+    })
     this.keyFlow = new KeyFlow({
       overlay: this.overlay,
       picker: this.picker,
       keyDialog: this.keyDialog,
+      providerFlow,
       reflect: this.ctx.reflect,
       isDisposed: () => this.disposed,
       stdinIsTTY: () => this.stdin.isTTY,
@@ -1593,12 +1616,30 @@ export class TuiApp {
   }
 
   /**
-   * bracketed paste 文本落地（右键粘贴/终端菜单粘贴）：先尝试剪贴板读图
-   * （命中则附图并吞掉这段 paste——粘贴进来的文本是图片字节的乱码，不插图
-   * 会污染输入框）；再识别图片路径加载为附件；最后才是普通文本插入。
+   * bracketed paste 文本落地（右键粘贴/终端菜单粘贴）：文本 overlay 激活时
+   * 先读图，图片只吞掉乱码不写字段；文本经代次/序列检查后交给对应控制器。
+   * 否则命中图片则附图，再识别图片路径，最后才是普通文本插入。
    * @param text - 终端传来的粘贴文本
    */
   private async handlePaste(text: string): Promise<void> {
+    const overlay = this.overlay
+    const active = overlay?.activeId() ?? null
+    const target = active === 'key-dialog' ? this.keyDialog : active === 'provider-editor' ? this.providerEditor : null
+    if (overlay !== null && active !== null && target !== null) {
+      const epoch = this.overlayPasteEpoch
+      const sequence = ++this.overlayPasteSequence
+      const paste = this.overlayPasteAction(target)
+      const imgResult = await readImageFromClipboard()
+      if (!this.overlayPasteIsCurrent(overlay, active, target, epoch, sequence)) return
+      if (imgResult) {
+        target.showNotice('剪贴板是图片，未写入文本字段；复制文本后重试')
+        overlay.rerender()
+        return
+      }
+      paste(text)
+      overlay.rerender()
+      return
+    }
     // 剪贴板当前是图片 → 附图并吞掉（与 Ctrl+V 互斥：右键粘贴产生 paste
     // 事件、Ctrl+V 产生 ctrl_v 按键，不会同时触发）。readImageFromClipboard
     // 无图/失败时返回 null（自然落入文本粘贴）；此处 catch 只接管线处理
@@ -3044,12 +3085,46 @@ export class TuiApp {
     this.renderBatcher.schedule()
   }
 
-  /** /key：Ctrl+V 读剪贴板文本进 Key 字段（空文本忽略；readTextFromClipboard 平台缺失时返回 null）。 */
-  private async pasteClipboardIntoKeyDialog(dialog: KeyDialogController): Promise<void> {
+  /** 文本 overlay：Ctrl+V 只接收当前代次、最新操作的可粘贴文本。 */
+  private async pasteClipboardIntoOverlay(target: {
+    pasteText(text: string): void
+    showNotice(text: string): void
+    beginPaste?(): (text: string) => void
+  }): Promise<void> {
+    const overlay = this.overlay
+    const active = overlay?.activeId() ?? null
+    if (overlay === null || active === null) return
+    const epoch = this.overlayPasteEpoch
+    const sequence = ++this.overlayPasteSequence
+    const paste = this.overlayPasteAction(target)
     const text = await readTextFromClipboard()
-    if (text === undefined || text === null || text === '') return
-    dialog.pasteText(text)
-    this.overlay?.rerender()
+    if (!this.overlayPasteIsCurrent(overlay, active, target, epoch, sequence)) return
+    if (typeof text !== 'string' || text.trim() === '') {
+      target.showNotice('剪贴板无内容可粘贴；复制文本后按 Ctrl+V 重试')
+      overlay.rerender()
+      return
+    }
+    paste(text)
+    overlay.rerender()
+  }
+
+  private overlayPasteAction(target: {
+    pasteText(text: string): void
+    beginPaste?(): (text: string) => void
+  }): (text: string) => void {
+    return target.beginPaste?.() ?? (text => { target.pasteText(text) })
+  }
+
+  private overlayPasteIsCurrent(
+    overlay: OverlayController,
+    active: string,
+    target: { pasteText(text: string): void },
+    epoch: number,
+    sequence: number,
+  ): boolean {
+    const currentTarget = active === 'key-dialog' ? this.keyDialog : active === 'provider-editor' ? this.providerEditor : null
+    return this.overlay === overlay && overlay.activeId() === active && currentTarget === target
+      && this.overlayPasteEpoch === epoch && this.overlayPasteSequence === sequence
   }
 
   /** /update：对照 npm latest 的只查不装检查（用户看到提示后手动更新；失败不抛）。 */
@@ -3070,7 +3145,7 @@ export class TuiApp {
     const ctx = this.actionCtx
     const early = this.actions.match(key, ctx, { phase: 'early', context: 'global' })
     if (early !== null && early.run(ctx, key) !== false) return
-    // overlay 独占焦点（key-dialog/picker/search/scroll/rewind/memory/palette）。
+    // overlay 独占焦点（key-dialog/provider-editor/picker/search/scroll/rewind/memory/palette）。
     if (this.overlayRouter.route(key)) return
     // 阻塞态轮询：挂起交互独占键盘（T3.1 提问 → P1 侧问 → Phase 8 审批）。
     for (const blocking of this.blockingKeys) {

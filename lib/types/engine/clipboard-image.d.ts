@@ -48,10 +48,12 @@ export declare function setClipboardReader(reader: ClipboardReader | null): void
 export declare function readImageFromClipboard(): Promise<ClipboardImage | null>;
 /**
  * 读系统剪贴板文本（Ctrl+V 无图时的 fallback；部分终端不经 bracketed paste
- * 传递粘贴文本）。各平台优先 pbpaste / wl-paste / xclip / PowerShell。
+ * 传递粘贴文本）。各平台优先 pbpaste / wl-paste / xclip / PowerShell；
+ * Linux 最后尝试 powershell.exe，覆盖 WSL 的 Windows 剪贴板。
+ * @param opts - 可选 shell 注入参数（缺省用真实 execFile/平台）
  * @returns 剪贴板文本；无工具或失败时 null
  */
-export declare function readTextFromClipboard(): Promise<string | null>;
+export declare function readTextFromClipboard(opts?: Pick<ShellClipboardOpts, 'execFile' | 'platform'>): Promise<string | null>;
 /**
  * 平台 shell 剪贴板读图链：darwin osascript / linux wl-paste+xclip / win32
  * PowerShell。任一步失败静默降级到下一个平台分支；全部失败返回 null。

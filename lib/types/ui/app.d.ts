@@ -127,6 +127,8 @@ export declare class TuiApp {
     private readonly submitQueue;
     /** /key、/login：API Key 设置对话框（掩码输入 + 联网验证 + 落盘）。 */
     private keyDialog;
+    /** /key：pi-ai 自定义端点、模型目录与凭据编辑器。 */
+    private providerEditor;
     /** /key 供应商密钥配置装配层（key-wizard/key-dialog 之上；deps 注入 openKeyDialog）。 */
     private keyFlow;
     /** /key 首启自动弹窗禁用（宿主/测试装配显式关闭；缺省 false=启用）。 */
@@ -149,7 +151,7 @@ export declare class TuiApp {
     private readonly menuKeys;
     /** inspect 上下文键（轮询位置在 slash 菜单之后——现状顺序保持）。 */
     private readonly inspectKeys;
-    /** overlay 键路由器（key-dialog/picker/search/scroll/rewind/memory/palette 委派）。 */
+    /** overlay 键路由器（key-dialog/provider-editor/picker/search/scroll/rewind/memory/palette 委派）。 */
     private readonly overlayRouter;
     /** footer 检查面板提示段（registry 构造期投影；审批段改由 renderLive 逐帧投影——p 段动态）。 */
     private readonly footerInspectHints;
@@ -301,6 +303,9 @@ export declare class TuiApp {
     private osc52WarningShown;
     /** bracketed paste 处理器 disposer（attach 注册，dispose 释放）。 */
     private pasteDisposer;
+    /** 文本 overlay 粘贴：进出代次防跨窗旧结果，操作序列防慢读乱序落地。 */
+    private overlayPasteEpoch;
+    private overlayPasteSequence;
     /**
      * 动态段高水位（display rows），跨轮保留。回缩会使输入框上跳，并把旧轨线
      * 留在空隙里（重影）。新会话 / 切会话时归零。
@@ -376,9 +381,9 @@ export declare class TuiApp {
     /** T3.1：结构化提问 answerer——薄转发 QuestionController（渲染/ESC/重绘由控制器回调承担）。 */
     private handleQuestionRequest;
     /**
-     * bracketed paste 文本落地（右键粘贴/终端菜单粘贴）：先尝试剪贴板读图
-     * （命中则附图并吞掉这段 paste——粘贴进来的文本是图片字节的乱码，不插图
-     * 会污染输入框）；再识别图片路径加载为附件；最后才是普通文本插入。
+     * bracketed paste 文本落地（右键粘贴/终端菜单粘贴）：文本 overlay 激活时
+     * 先读图，图片只吞掉乱码不写字段；文本经代次/序列检查后交给对应控制器。
+     * 否则命中图片则附图，再识别图片路径，最后才是普通文本插入。
      * @param text - 终端传来的粘贴文本
      */
     private handlePaste;
@@ -699,8 +704,10 @@ export declare class TuiApp {
     private setYoloMode;
     /** C3 项 4：经 planMode 服务切换 plan 状态（服务缺失时回显警告，不再静默）。 */
     private setPlanMode;
-    /** /key：Ctrl+V 读剪贴板文本进 Key 字段（空文本忽略；readTextFromClipboard 平台缺失时返回 null）。 */
-    private pasteClipboardIntoKeyDialog;
+    /** 文本 overlay：Ctrl+V 只接收当前代次、最新操作的可粘贴文本。 */
+    private pasteClipboardIntoOverlay;
+    private overlayPasteAction;
+    private overlayPasteIsCurrent;
     /** /update：对照 npm latest 的只查不装检查（用户看到提示后手动更新；失败不抛）。 */
     private runUpdateCheck;
     /**

@@ -48,12 +48,12 @@ TUI 是**纯展示层**:
 | `sessionProjections` | `/status` 面板(goal/todos/plan) | ⚠ 警告(会话汇总段仍可用) |
 | `workflowEngine` | `/workflow` 面板 | 优先当前 agent isolate,host 回退;都无则 ⚠ |
 | `planMode` | plan 模式状态 | 优先当前 agent isolate,host 回退;都无则徽标不显示 |
-| `llm` | 模型选择器目录、识图模态刷新 | ⚠ 警告 |
+| `llm` | 模型选择器目录、pi-ai 草稿模型发现、识图模态刷新 | ⚠ 警告；provider 可手输模型 |
 | `visionBridge` | 视觉桥自动探测 | 图片不发送并警告 |
 | `userQuestions` | 结构化提问面板 | 降级 |
 | `tools` | 工具卡 presenter 桥 | 软降级 |
 | `sessionPersistence` | 会话恢复列表 | 降级 |
-| `settings` / `permission` / `credentials` | `/config` 面板 | 对应段不渲染 |
+| `settings` / `permission` / `credentials` | `/config` 面板；`/key` profile/key 保存 | 对应段不渲染；pi-ai 编辑回退 key-only，新建不可用 |
 | `lsp` | LSP 诊断徽标 | 内置桥降级 |
 | `appExit` / `cmdlineArgs` | 退出 / --help | 降级 |
 | `commands` | slash 注册表(tui.commands 服务) | /help 警告 |

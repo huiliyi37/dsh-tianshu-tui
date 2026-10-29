@@ -118,6 +118,7 @@ export class KeyDialogController implements OverlayRenderer {
   private phase: KeyDialogPhase = 'input'
   private value = ''
   private error: string | null = null
+  private notice: string | null = null
   private credentials: KeyDialogCredentials | undefined
   private target: KeyDialogTarget = DEEPSEEK_KEY_TARGET
   private openFlag = false
@@ -155,6 +156,7 @@ export class KeyDialogController implements OverlayRenderer {
     this.target = target ?? DEEPSEEK_KEY_TARGET
     this.value = ''
     this.error = null
+    this.notice = null
     this.openFlag = true
     this.closeRequested = false
     if (credentials === undefined) {
@@ -226,6 +228,12 @@ export class KeyDialogController implements OverlayRenderer {
     if (!this.openFlag || this.phase !== 'input') return
     this.value += text.replace(/\s+/g, '')
     this.error = null
+  }
+
+  showNotice(text: string): void {
+    if (!this.openFlag) return
+    this.notice = text
+    this.onChange?.()
   }
 
   /**
@@ -337,6 +345,7 @@ export class KeyDialogController implements OverlayRenderer {
         break
       }
     }
+    if (this.notice !== null) lines.push(color(`⚠ ${this.notice}`, theme.warning))
     return lines.map(line => truncateToDisplayWidth(line, width))
   }
 }

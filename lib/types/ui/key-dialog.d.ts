@@ -84,6 +84,7 @@ export declare class KeyDialogController implements OverlayRenderer {
     private phase;
     private value;
     private error;
+    private notice;
     private credentials;
     private target;
     private openFlag;
@@ -125,6 +126,7 @@ export declare class KeyDialogController implements OverlayRenderer {
      * @param text - 终端/剪贴板传来的粘贴文本。
      */
     pasteText(text: string): void;
+    showNotice(text: string): void;
     /**
      * 装配方查询：用户已请求关闭（Esc/Ctrl+C/终态 Enter）——deactivate overlay。
      * @returns 请求关闭返回 true。

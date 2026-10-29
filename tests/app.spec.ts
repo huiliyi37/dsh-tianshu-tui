@@ -8514,6 +8514,41 @@ describe('技能发现携带会话 cwd（#44：项目级技能可见）', () => 
 })
 
 describe('/key 键路由（审查修复）', () => {
+  async function bootKeyDialog() {
+    const ctx = makeCtx()
+    const fallback = ctx.reflect.get.getMockImplementation()! as (name: string) => unknown
+    ctx.reflect.get.mockImplementation((name: string) => {
+      if (name === 'credentials') {
+        return {
+          describe: vi.fn(async () => ({ configured: false, writable: true })),
+          set: vi.fn(async () => {}),
+        }
+      }
+      return fallback(name)
+    })
+    const agent = makeAgent('key-paste')
+    ctx.agents.create.mockResolvedValue(makeHandle(agent))
+    ctx.sessions.get.mockReturnValue(agent.session)
+    const stdout = makeStdout()
+    const stdin = makeStdin()
+    const app = new TuiApp({ ctx, stdout, stdin })
+    await app.attach()
+    const state = app as unknown as {
+      overlay: { activeId(): string | null; activate(id: string): void; deactivate(): void }
+      keyDialog: {
+        open(credentials: unknown, target: unknown): Promise<void>
+        render(width: number, height: number): string[]
+      }
+      inputLine: { value: string }
+    }
+    app.handleSubmit('/key')
+    await vi.waitFor(() => expect(state.overlay.activeId()).toBe('key-dialog'))
+    vi.mocked(readImageFromClipboard).mockClear()
+    vi.mocked(readTextFromClipboard).mockClear()
+    const keyValue = () => (state.keyDialog as unknown as { value: string }).value
+    return { app, stdin, stdout, state, keyValue }
+  }
+
   it('key-dialog overlay 激活后 Esc 可达对话框状态机并关闭', async () => {
     const ctx = makeCtx()
     const agent = makeAgent('fresh-1')
@@ -8534,6 +8569,313 @@ describe('/key 键路由（审查修复）', () => {
     stdin.emit('data', '\x1b')
     await new Promise(resolve => setTimeout(resolve, 200))
     expect(state.overlay.activeId()).toBeNull()
+    await app.dispose()
+  })
+
+  it('Ctrl+V 系统剪贴板文本进入 Key 字段，不读图也不写底层输入行', async () => {
+    vi.mocked(readTextFromClipboard).mockResolvedValueOnce(' sk-ctrl-v\nkey67890 \r\n')
+    const { app, stdin, state } = await bootKeyDialog()
+    stdin.emit('data', '\x16')
+    await vi.waitFor(() => {
+      expect(state.keyDialog.render(100, 24).join('\n')).toContain('Key: ••••…7890')
+    })
+    expect(state.inputLine.value).toBe('')
+    expect(readImageFromClipboard).not.toHaveBeenCalled()
+    await app.dispose()
+  })
+
+  it('bracketed paste 进入 Key 字段并剥离空白，不写底层输入行', async () => {
+    const { app, stdin, state } = await bootKeyDialog()
+    stdin.emit('data', '\x1b[200~ sk-native\nkey12345 \x1b[201~')
+    await vi.waitFor(() => {
+      expect(state.keyDialog.render(100, 24).join('\n')).toContain('Key: ••••…2345')
+    })
+    expect(state.inputLine.value).toBe('')
+    expect(readImageFromClipboard).toHaveBeenCalledTimes(1)
+    await app.dispose()
+  })
+
+  it('慢速 Ctrl+V 后于原生粘贴返回时丢弃旧结果，不拼成 secondfirst', async () => {
+    const { app, stdin, keyValue } = await bootKeyDialog()
+    let resolveRead!: (value: string | null) => void
+    vi.mocked(readTextFromClipboard).mockImplementationOnce(() => new Promise<string | null>(resolve => { resolveRead = resolve }))
+    stdin.emit('data', '\x16')
+    await vi.waitFor(() => expect(readTextFromClipboard).toHaveBeenCalledTimes(1))
+    vi.mocked(readImageFromClipboard).mockResolvedValueOnce(null)
+    stdin.emit('data', '\x1b[200~second\x1b[201~')
+    await vi.waitFor(() => expect(keyValue()).toBe('second'))
+    resolveRead('first')
+    await new Promise(resolve => setImmediate(resolve))
+    expect(keyValue()).toBe('second')
+    await app.dispose()
+  })
+
+  it('Ctrl+V 读取期间关闭并重开另一供应商时丢弃旧结果', async () => {
+    const { app, stdin, state, keyValue } = await bootKeyDialog()
+    let resolveRead!: (value: string | null) => void
+    vi.mocked(readTextFromClipboard).mockImplementationOnce(() => new Promise<string | null>(resolve => { resolveRead = resolve }))
+    stdin.emit('data', '\x16')
+    await vi.waitFor(() => expect(readTextFromClipboard).toHaveBeenCalledTimes(1))
+    state.overlay.deactivate()
+    await state.keyDialog.open({
+      describe: async () => ({ configured: false, writable: true }),
+      set: async () => {},
+    }, {
+      provider: 'other', displayName: 'Other', ref: 'OTHER_API_KEY', probe: async () => 'unknown',
+    })
+    state.overlay.activate('key-dialog')
+    resolveRead('sk-stale-key')
+    await new Promise(resolve => setImmediate(resolve))
+    expect(state.keyDialog.render(100, 24).join('\n')).toContain('设置 Other API Key')
+    expect(keyValue()).toBe('')
+    await app.dispose()
+  })
+
+  it.each([
+    ['null', null],
+    ['空串', ''],
+    ['纯空白', ' \r\n\t'],
+  ])('Ctrl+V 读取 %s 时在当前 overlay 立即可见提示且不写 Key', async (_label, value) => {
+    vi.mocked(readTextFromClipboard).mockResolvedValueOnce(value)
+    const { app, stdin, state, keyValue } = await bootKeyDialog()
+    stdin.emit('data', '\x16')
+    await vi.waitFor(() => expect(readTextFromClipboard).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => {
+      const text = state.keyDialog.render(100, 24).join('\n')
+      expect(text).toContain('剪贴板无内容可粘贴')
+      expect(text).toContain('复制文本后按 Ctrl+V 重试')
+    })
+    expect(state.overlay.activeId()).toBe('key-dialog')
+    expect(keyValue()).toBe('')
+    await app.dispose()
+  })
+
+  it('原生图片粘贴吞掉乱码并在当前 overlay 提示，不写 Key 或底层输入行', async () => {
+    vi.mocked(readImageFromClipboard).mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      mime: 'image/png', name: 'clipboard.png', source: 'png',
+    })
+    const { app, stdin, state, keyValue } = await bootKeyDialog()
+    stdin.emit('data', '\x1b[200~���PNG\x1b[201~')
+    await vi.waitFor(() => {
+      const text = state.keyDialog.render(100, 24).join('\n')
+      expect(text).toContain('剪贴板是图片，未写入文本字段')
+      expect(text).toContain('复制文本后重试')
+    })
+    expect(readImageFromClipboard).toHaveBeenCalledTimes(1)
+    expect(state.overlay.activeId()).toBe('key-dialog')
+    expect(keyValue()).toBe('')
+    expect(state.inputLine.value).toBe('')
+    await app.dispose()
+  })
+
+  it('provider-editor 复用 bracketed paste 与 Ctrl+V，字段正确且不写底层输入行', async () => {
+    const ctx = makeCtx()
+    const agent = makeAgent('provider-paste')
+    ctx.agents.create.mockResolvedValue(makeHandle(agent))
+    ctx.sessions.get.mockReturnValue(agent.session)
+    const stdin = makeStdin()
+    const app = new TuiApp({ ctx, stdout: makeStdout(), stdin })
+    await app.attach()
+    const state = app as unknown as {
+      overlay: { activeId(): string | null; activate(id: string): void }
+      providerEditor: {
+        open(session: unknown): void
+        handleKey(name: string, char: string): void
+        render(width: number, height: number): string[]
+      }
+      inputLine: { value: string }
+    }
+    state.providerEditor.open({
+      mode: 'edit', title: '编辑 Acme', taken: [],
+      draft: {
+        route: 'acme', declared: true, profile: { api: 'openai-completions' },
+        models: [{ id: 'm' }], modelsOverridden: true, keyDraft: '',
+      },
+      discover: async () => [], save: async () => ({ kind: 'saved' }),
+    })
+    state.overlay.activate('provider-editor')
+    vi.mocked(readImageFromClipboard).mockClear()
+    stdin.emit('data', '\x1b[200~ http://127.0.0.1:8317/v1\n\x1b[201~')
+    await vi.waitFor(() => expect(state.providerEditor.render(100, 24).join('\n')).toContain('Base URL: http://127.0.0.1:8317/v1'))
+    for (let index = 0; index < 3; index++) state.providerEditor.handleKey('down', '')
+    vi.mocked(readTextFromClipboard).mockResolvedValueOnce(' sk-ctrl-v\n')
+    stdin.emit('data', '\x16')
+    await vi.waitFor(() => expect(state.providerEditor.render(100, 24).join('\n')).toContain('••••…rl-v'))
+    expect(state.inputLine.value).toBe('')
+    expect(readImageFromClipboard).toHaveBeenCalledTimes(1)
+    await app.dispose()
+  })
+
+  it('provider-editor 空剪贴板与图片提示在当前 overlay 可见且不改 key/route', async () => {
+    const ctx = makeCtx()
+    const agent = makeAgent('provider-notice')
+    ctx.agents.create.mockResolvedValue(makeHandle(agent))
+    ctx.sessions.get.mockReturnValue(agent.session)
+    const stdin = makeStdin()
+    const app = new TuiApp({ ctx, stdout: makeStdout(), stdin, disableKeyAutoPrompt: true })
+    await app.attach()
+    const state = app as unknown as {
+      overlay: { activeId(): string | null; activate(id: string): void }
+      providerEditor: { open(session: unknown): void; render(width: number, height: number): string[] }
+      inputLine: { value: string }
+    }
+    const draft = {
+      route: 'acme', declared: true,
+      profile: { api: 'openai-completions', baseURL: 'https://acme.test/v1' },
+      models: [{ id: 'm' }], modelsOverridden: true, keyDraft: 'sk-keep',
+    }
+    state.providerEditor.open({
+      mode: 'create', title: '新增', taken: [], draft,
+      discover: async () => [], save: async () => ({ kind: 'saved' }),
+    })
+    state.overlay.activate('provider-editor')
+    vi.mocked(readTextFromClipboard).mockResolvedValueOnce(null)
+    stdin.emit('data', '\x16')
+    await vi.waitFor(() => expect(state.providerEditor.render(100, 24).join('\n')).toContain('剪贴板无内容可粘贴'))
+    expect(state.overlay.activeId()).toBe('provider-editor')
+    vi.mocked(readImageFromClipboard).mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      mime: 'image/png', name: 'clipboard.png', source: 'png',
+    })
+    stdin.emit('data', '\x1b[200~���PNG\x1b[201~')
+    await vi.waitFor(() => expect(state.providerEditor.render(100, 24).join('\n')).toContain('剪贴板是图片，未写入文本字段'))
+    expect(state.overlay.activeId()).toBe('provider-editor')
+    expect(draft.route).toBe('acme')
+    expect(draft.keyDraft).toBe('sk-keep')
+    expect(state.providerEditor.render(100, 24).join('\n')).not.toContain('sk-keep')
+    expect(state.inputLine.value).toBe('')
+    await app.dispose()
+  })
+
+  it('provider 慢速 Ctrl+V/原生粘贴绑定发起时 key，焦点移到 route 也不漂移', async () => {
+    const ctx = makeCtx()
+    const agent = makeAgent('provider-paste-focus')
+    ctx.agents.create.mockResolvedValue(makeHandle(agent))
+    ctx.sessions.get.mockReturnValue(agent.session)
+    const stdin = makeStdin()
+    const app = new TuiApp({ ctx, stdout: makeStdout(), stdin, disableKeyAutoPrompt: true })
+    await app.attach()
+    const state = app as unknown as {
+      overlay: { activate(id: string): void }
+      providerEditor: { open(session: unknown): void; handleKey(name: string, char: string): void }
+      inputLine: { value: string }
+    }
+    const draft = {
+      route: 'acme', declared: true,
+      profile: { api: 'openai-completions', baseURL: 'https://acme.test/v1' },
+      models: [{ id: 'm' }], modelsOverridden: true, keyDraft: '',
+    }
+    state.providerEditor.open({
+      mode: 'create', title: '新增', taken: [], draft,
+      discover: async () => [], save: async () => ({ kind: 'saved' }),
+    })
+    state.overlay.activate('provider-editor')
+    for (let index = 0; index < 5; index++) state.providerEditor.handleKey('down', '')
+    vi.mocked(readTextFromClipboard).mockClear()
+    let resolveText!: (value: string | null) => void
+    vi.mocked(readTextFromClipboard).mockImplementationOnce(() => new Promise<string | null>(resolve => { resolveText = resolve }))
+    stdin.emit('data', '\x16')
+    await vi.waitFor(() => expect(readTextFromClipboard).toHaveBeenCalledTimes(1))
+    for (let index = 0; index < 5; index++) state.providerEditor.handleKey('up', '')
+    resolveText('sk-ctrl')
+    await vi.waitFor(() => expect(draft.keyDraft).toBe('sk-ctrl'))
+    expect(draft.route).toBe('acme')
+
+    for (let index = 0; index < 5; index++) state.providerEditor.handleKey('down', '')
+    vi.mocked(readImageFromClipboard).mockClear()
+    let resolveImage!: (value: null) => void
+    vi.mocked(readImageFromClipboard).mockImplementationOnce(() => new Promise<null>(resolve => { resolveImage = resolve }))
+    stdin.emit('data', '\x1b[200~sk-native\x1b[201~')
+    await vi.waitFor(() => expect(readImageFromClipboard).toHaveBeenCalledTimes(1))
+    for (let index = 0; index < 5; index++) state.providerEditor.handleKey('up', '')
+    resolveImage(null)
+    await vi.waitFor(() => expect(draft.keyDraft).toBe('sk-ctrlsk-native'))
+    expect(draft.route).toBe('acme')
+    expect(state.inputLine.value).toBe('')
+    await app.dispose()
+  })
+
+  it('/key 新建自定义 pi-ai 后写 profile/key，且新 route 在 /model 可见', async () => {
+    const ctx = makeCtx()
+    const fallback = ctx.reflect.get.getMockImplementation()! as (name: string) => unknown
+    const order: string[] = []
+    const liveProviders: Array<{ id: string; name: string }> = []
+    const settings = {
+      writable: true,
+      describe: vi.fn(() => [{ ns: 'llm-pi-ai', value: { providers: {} }, user: { providers: {} }, revision: 5 }]),
+      mutate: vi.fn(async (_ns: string, ops: Array<{ path: readonly string[]; value: unknown }>) => {
+        order.push('settings')
+        const route = ops[0]?.path[1]
+        const profile = ops[0]?.value as { displayName?: string }
+        if (route !== undefined) liveProviders.push({ id: route, name: profile.displayName ?? route })
+      }),
+    }
+    const credentials = {
+      describe: vi.fn(async () => ({ configured: false, writable: true })),
+      set: vi.fn(async () => { order.push('credentials') }),
+    }
+    const llm = {
+      listProviders: () => liveProviders,
+      listConfigurableProviders: () => [{
+        provider: 'openrouter', displayName: 'OpenRouter', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openrouter'],
+      }],
+      listModels: async (provider: string) => provider === 'acme' ? [{ id: 'm', name: 'm' }] : [],
+      resolveModelInfo: vi.fn(async () => ({ inputModalities: ['text'] })),
+    }
+    ctx.reflect.get.mockImplementation((name: string) => {
+      if (name === 'settings') return settings
+      if (name === 'credentials') return credentials
+      if (name === 'llm') return llm
+      return fallback(name)
+    })
+    const agent = makeAgent('provider-create')
+    ctx.agents.create.mockResolvedValue(makeHandle(agent))
+    ctx.sessions.get.mockReturnValue(agent.session)
+    const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin(), disableKeyAutoPrompt: true })
+    await app.attach()
+    const state = app as unknown as {
+      overlay: { activeId(): string | null; deactivate(): void }
+      picker: { move(delta: number): void; commit(): void; render(width: number, height: number): string[] }
+      providerEditor: { handleKey(name: string, char: string): void; render(width: number, height: number): string[] }
+    }
+    const type = (text: string) => {
+      for (const char of text) state.providerEditor.handleKey('unknown', char)
+    }
+    app.handleSubmit('/key')
+    await vi.waitFor(() => expect(state.overlay.activeId()).toBe('picker'))
+    state.picker.move(1)
+    state.picker.commit()
+    await vi.waitFor(() => expect(state.overlay.activeId()).toBe('provider-editor'))
+    type('acme')
+    state.providerEditor.handleKey('return', '')
+    type('Acme')
+    state.providerEditor.handleKey('return', '')
+    type('http://127.0.0.1:8317/v1')
+    state.providerEditor.handleKey('return', '')
+    state.providerEditor.handleKey('right', '')
+    state.providerEditor.handleKey('return', '')
+    state.providerEditor.handleKey('unknown', 'a')
+    type('m')
+    state.providerEditor.handleKey('return', '')
+    state.providerEditor.handleKey('down', '')
+    type('sk-local')
+    state.providerEditor.handleKey('down', '')
+    state.providerEditor.handleKey('down', '')
+    state.providerEditor.handleKey('return', '')
+    await vi.waitFor(() => expect(settings.mutate).toHaveBeenCalledOnce())
+    expect(settings.mutate).toHaveBeenCalledWith('llm-pi-ai', [{
+      op: 'set', path: ['providers', 'acme'],
+      value: {
+        api: 'openai-responses', displayName: 'Acme', baseURL: 'http://127.0.0.1:8317/v1',
+        models: [{ id: 'm' }], apiKeyEnv: 'ACME_API_KEY',
+      },
+    }], 5)
+    expect(credentials.set).toHaveBeenCalledWith('ACME_API_KEY', 'sk-local')
+    expect(order).toEqual(['settings', 'credentials'])
+    state.overlay.deactivate()
+    app.handleSubmit('/model')
+    await vi.waitFor(() => expect(state.picker.render(100, 24).join('\n')).toContain('acme/m'))
     await app.dispose()
   })
 })

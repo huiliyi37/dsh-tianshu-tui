@@ -75,6 +75,65 @@ describe('readImageFromClipboard 注入点', () => {
   })
 })
 
+describe('readTextFromClipboard shell fallback', () => {
+  it('Linux/WSL：wl-paste、xclip 失败 → powershell.exe 读取 Windows 剪贴板', async () => {
+    const calls: [string, string[]][] = []
+    const result = await readTextFromClipboard({
+      platform: 'linux',
+      execFile: async (bin, args) => {
+        calls.push([bin, args])
+        if (bin === 'powershell.exe') return { stdout: 'sk-wsl-key\r\n' }
+        throw new Error(`${bin} unavailable`)
+      },
+    })
+    expect(result).toBe('sk-wsl-key\r\n')
+    expect(calls).toEqual([
+      ['wl-paste', []],
+      ['xclip', ['-selection', 'clipboard', '-o']],
+      ['powershell.exe', ['-NoProfile', '-Command', 'Get-Clipboard']],
+    ])
+  })
+
+  it('普通 Linux：所有文本剪贴板工具失败 → null，不抛错', async () => {
+    const calls: string[] = []
+    const result = await readTextFromClipboard({
+      platform: 'linux',
+      execFile: async (bin) => {
+        calls.push(bin)
+        throw new Error('command not found')
+      },
+    })
+    expect(result).toBeNull()
+    expect(calls).toEqual(['wl-paste', 'xclip', 'powershell.exe'])
+  })
+
+  it('wl-paste 成功 → 保留原路径，不调用 PowerShell', async () => {
+    const calls: string[] = []
+    const result = await readTextFromClipboard({
+      platform: 'linux',
+      execFile: async (bin) => {
+        calls.push(bin)
+        return { stdout: 'wayland text' }
+      },
+    })
+    expect(result).toBe('wayland text')
+    expect(calls).toEqual(['wl-paste'])
+  })
+
+  it('win32 保持原生 powershell 命令', async () => {
+    const calls: [string, string[]][] = []
+    const result = await readTextFromClipboard({
+      platform: 'win32',
+      execFile: async (bin, args) => {
+        calls.push([bin, args])
+        return { stdout: 'windows text' }
+      },
+    })
+    expect(result).toBe('windows text')
+    expect(calls).toEqual([['powershell', ['-NoProfile', '-Command', 'Get-Clipboard']]])
+  })
+})
+
 describe('tryShellClipboard linux', () => {
   it('无工具（全部命令失败）→ null', async () => {
     const result = await tryShellClipboard({
