@@ -7,6 +7,9 @@
 [![Node](https://img.shields.io/node/v/@huiliyi37/dsh-tianshu-tui.svg)](https://www.npmjs.com/package/@huiliyi37/dsh-tianshu-tui)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![dshfind](https://dshfind.com/api/badge/huiliyi37/dsh-tianshu-tui?lang=zh)](https://dshfind.com/zh/plugins/huiliyi37/dsh-tianshu-tui?ref=badge)
+[![官网](https://img.shields.io/badge/website-tianshuharness.com-0f766e)](https://tianshuharness.com/)
+[![上游项目](https://img.shields.io/badge/upstream-Tianshu--harness-181717?logo=github)](https://github.com/huiliyi37/Tianshu-harness)
+[![论坛](https://img.shields.io/badge/forum-tianshu.club-2563eb)](https://tianshu.club/)
 
 中文 · [English](README.en.md)
 
@@ -162,6 +165,14 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+## 官网与社区
+
+| 入口 | 说明 |
+|---|---|
+| **[天枢 Harness 官网](https://tianshuharness.com/)** | 官方网站与项目介绍 |
+| **[Tianshu-harness 上游项目](https://github.com/huiliyi37/Tianshu-harness)** | 上游源码、Issue 与版本动态 |
+| **[天枢论坛](https://tianshu.club/)** | 使用交流、经验分享与问题讨论 |
 
 ## 社区生态
 

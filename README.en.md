@@ -6,6 +6,9 @@
 [![GitHub release](https://img.shields.io/github/v/release/huiliyi37/dsh-tianshu-tui?include_prereleases)](https://github.com/huiliyi37/dsh-tianshu-tui/releases)
 [![Node](https://img.shields.io/node/v/@huiliyi37/dsh-tianshu-tui.svg)](https://www.npmjs.com/package/@huiliyi37/dsh-tianshu-tui)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/website-tianshuharness.com-0f766e)](https://tianshuharness.com/)
+[![Upstream](https://img.shields.io/badge/upstream-Tianshu--harness-181717?logo=github)](https://github.com/huiliyi37/Tianshu-harness)
+[![Forum](https://img.shields.io/badge/forum-tianshu.club-2563eb)](https://tianshu.club/)
 
 [中文](README.md) · English
 
@@ -161,6 +164,14 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+## Official site and community
+
+| Destination | About |
+|---|---|
+| **[Tianshu Harness website](https://tianshuharness.com/)** | Official website and project overview |
+| **[Tianshu-harness upstream](https://github.com/huiliyi37/Tianshu-harness)** | Upstream source code, issues, and releases |
+| **[Tianshu forum](https://tianshu.club/)** | User discussions, experience sharing, and support |
 
 ## Community ecosystem
 
