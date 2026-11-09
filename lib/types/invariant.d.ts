@@ -1,23 +1,18 @@
 /**
- * Runtime invariant companion for @deepseek-ai/dsh-tianshu-tui.
+ * Compatibility no-op invariant companion for @huiliyi37/dsh-tianshu-tui.
  *
- * The TUI is a terminal presentation layer: every stream it renders
- * (session/event, approval/request, subagent/*, workflow/*) is owned and
- * asserted by the emitting package, and the runner's own mutable state
- * (transcript view, live region, pending interaction) is process-local UI
- * state asserted behaviorally by package tests and the real-composition
- * suite. No cross-plugin event/data relation is owned here.
+ * The TUI owns no cross-plugin event/data relation: emitting packages assert
+ * their streams, while process-local UI state is covered by behavioral and
+ * real-composition tests. Host 0.2.2 no longer provides the official invariant
+ * registry, so this entry deliberately neither injects nor registers it.
  *
- * @module @deepseek-ai/dsh-tianshu-tui/invariant
+ * Keep the published path and plugin exports for package-layout compatibility.
+ *
+ * @module @huiliyi37/dsh-tianshu-tui/invariant
  */
-import type { Context } from '@deepseek-ai/cordis';
-/** Cordis companion plugin name. */
+/** Cordis companion plugin name retained for profile compatibility. */
 export declare const name = "tui-invariant";
-/** Service required before the companion can reserve package ownership. */
+/** No retired service is required during plugin activation. */
 export declare const inject: string[];
-/**
- * Register this package's invariant companion.
- * @param ctx - Cordis context carrying the invariant service.
- * @returns the installed registration's disposer after setup succeeds.
- */
-export declare const apply: (ctx: Context) => Promise<() => void>;
+/** Preserve the asynchronous disposer shape without installing any checks. */
+export declare const apply: () => Promise<() => void>;

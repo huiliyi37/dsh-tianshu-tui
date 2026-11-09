@@ -61,6 +61,11 @@ describe('provider-profile — 最小编辑与模型采纳', () => {
       baseURL: 'https://old.example/v1',
       displayName: 'Old',
       headers: { 'X-Tenant': 'private' },
+      maxRequestImages: 25,
+      imageOffloadCountQuantum: 5,
+      maxRequestImageBytes: 1048576,
+      requestImagePixelBudget: 2048,
+      futureProviderOption: { enabled: true },
       models: [{ id: 'old', compat: { thinkingFormat: 'deepseek' } }],
     }
     const value = draft({
@@ -68,7 +73,14 @@ describe('provider-profile — 最小编辑与模型采纳', () => {
       models: [{ id: 'new', compat: { thinkingFormat: 'deepseek' } }],
     })
     const next = profileForSave(value, 'ACME_GATEWAY_API_KEY', undefined)
-    expect(next.headers).toEqual({ 'X-Tenant': 'private' })
+    expect(next).toMatchObject({
+      headers: { 'X-Tenant': 'private' },
+      maxRequestImages: 25,
+      imageOffloadCountQuantum: 5,
+      maxRequestImageBytes: 1048576,
+      requestImagePixelBudget: 2048,
+      futureProviderOption: { enabled: true },
+    })
     expect(providerPathOps(['providers', 'acme-gateway'], original, next)).toEqual([
       { op: 'set', path: ['providers', 'acme-gateway', 'baseURL'], value: 'http://127.0.0.1:9000/v1' },
       { op: 'set', path: ['providers', 'acme-gateway', 'models'], value: [{ id: 'new', compat: { thinkingFormat: 'deepseek' } }] },

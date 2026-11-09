@@ -29,8 +29,12 @@ export interface KeyFlowReflect {
 
 /** settings 服务最小面（describe/mutate；缺席时向导只存 key 不做 profile 激活）。 */
 export interface KeyWizardSettingsFacet {
-  describe(options?: { redactSecrets?: boolean }): Array<{ ns: string; value: unknown; user?: unknown }>
-  mutate(ns: string, ops: Array<{ op: string; path: readonly string[]; value: unknown }>): Promise<void>
+  describe(options?: { redactSecrets?: boolean }): Array<{ ns: string; value: unknown; user?: unknown; revision?: number }>
+  mutate(
+    ns: string,
+    ops: Array<{ op: string; path: readonly string[]; value: unknown }>,
+    expectedRevision?: number,
+  ): Promise<void>
 }
 
 /** key-flow 装配依赖（全部由 TuiApp 注入；null = 服务缺席，走降级路径）。 */
@@ -159,7 +163,7 @@ export class KeyFlow {
     if (overlay === null || keyDialog === null) return
     if (entry?.provider === 'deepseek-account') return
     if (overlay.activeId() === 'key-dialog') return
-    const sections = this.readResolvedSettingsSections()
+    const { sections, revisions } = this.readResolvedSettingsSnapshot()
     const namedEnv = entry === undefined ? undefined : this.profileApiKeyEnv(sections, entry)
     const target: KeyDialogTarget = entry === undefined
       ? DEEPSEEK_KEY_TARGET
@@ -171,7 +175,7 @@ export class KeyFlow {
         ...namedEnv === undefined
           && entry.settingsPath.length > 0
           && this.settingsMutationFacet() !== undefined
-          ? { afterSave: () => this.activateRouteProfile(entry) }
+          ? { afterSave: () => this.activateRouteProfile(entry, revisions.get(entry.settingsNs)) }
           : {},
       }
     await keyDialog.open(credentials, target)
@@ -245,7 +249,24 @@ export class KeyFlow {
 
   /** 读取 settings 各命名空间的已解析值（ns 对象原样保留供 mutate 回传）。 */
   readResolvedSettingsSections(): Map<string, unknown> {
-    return this.readSettingsSections('value') ?? new Map()
+    return this.readResolvedSettingsSnapshot().sections
+  }
+
+  private readResolvedSettingsSnapshot(): { sections: Map<string, unknown>; revisions: Map<string, number> } {
+    const sections = new Map<string, unknown>()
+    const revisions = new Map<string, number>()
+    const settings = this.settingsMutationFacet()
+    if (settings === undefined) return { sections, revisions }
+    try {
+      for (const descriptor of settings.describe()) {
+        if (descriptor.value !== undefined) sections.set(String(descriptor.ns), descriptor.value)
+        if (typeof descriptor.revision === 'number') revisions.set(String(descriptor.ns), descriptor.revision)
+      }
+    } catch {
+      sections.clear()
+      revisions.clear()
+    }
+    return { sections, revisions }
   }
 
   /** 读取原始用户层；字段是否由用户覆盖只能在这一层判断，不能看 resolved 默认值。 */
@@ -359,21 +380,32 @@ export class KeyFlow {
         await llm.discoverModels(entry.settingsNs, request)
         return 'ok'
       } catch (error) {
-        const code = (error as { code?: unknown }).code
-        return code === 'AUTH' || code === 'INVALID_CREDENTIAL' ? 'invalid' : 'unknown'
+        const failure = error as { code?: unknown; message?: unknown }
+        if (failure.code === 'AUTH' || failure.code === 'INVALID_CREDENTIAL') return 'invalid'
+        if (failure.code === 'DISCOVERY_FAILED'
+          && typeof failure.message === 'string'
+          && /\banswered (?:401|403)\b/.test(failure.message)) return 'invalid'
+        return 'unknown'
       }
     }
   }
 
-  /** 保存 key 后激活路由：写入最小 profile（settingsPath 非空 = pi-ai 路由）。 */
-  private async activateRouteProfile(entry: WizardProviderEntry): Promise<void> {
+  /** 保存 key 后激活路由：按打开对话框时的 describe 快照写入最小 profile。 */
+  private async activateRouteProfile(entry: WizardProviderEntry, expectedRevision?: number): Promise<void> {
     const settings = this.settingsMutationFacet()
     if (settings === undefined) return
-    await settings.mutate(entry.settingsNs, [{
-      op: 'set',
-      path: [...entry.settingsPath, 'apiKeyEnv'],
-      value: resolveKeyRef(entry.provider, undefined),
-    }])
+    try {
+      await settings.mutate(entry.settingsNs, [{
+        op: 'set',
+        path: [...entry.settingsPath, 'apiKeyEnv'],
+        value: resolveKeyRef(entry.provider, undefined),
+      }], expectedRevision)
+    } catch (error) {
+      if ((error as { code?: unknown }).code === 'SETTINGS_CONFLICT') {
+        throw new Error(`SETTINGS_CONFLICT: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+      }
+      throw error
+    }
   }
 
   /** 当前 base 无 sessionController；按官方 groups 的 llm 数据源判定账号组非空。 */

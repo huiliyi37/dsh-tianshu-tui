@@ -28,7 +28,7 @@ fi
 
 if [ ! -f "$PROFILE_DIR/package.json" ]; then
   echo "首次运行：装配 profile tui（dsh-base + 本插件 link: 本仓库）..."
-  node "$CLI" plugin --profile tui add "@deepseek-ai/dsh-base@0.2.1-rc.4" "link:$ROOT"
+  node "$CLI" plugin --profile tui add "@deepseek-ai/dsh-base@0.2.2-rc.1" "link:$ROOT"
 fi
 
 exec node "$CLI" --profile tui "$@"

@@ -1648,6 +1648,20 @@ describe('内置命令 — /effort', () => {
     expect(echo).toHaveBeenCalledWith(expect.stringContaining('仅本会话'))
   })
 
+  it('/effort 非 persist 保留 live Agent 当前路由，不回退部署默认模型', async () => {
+    const { cmd, deps } = effortByName()
+    const { saveSelection, ctx } = effortCtx()
+    deps.currentAgent.mockReturnValue({
+      model: { current: () => ({ provider: 'live-provider', model: 'live-model' }) },
+    } as unknown as Agent)
+    const { args } = makeArgs({ text: 'max', ctx })
+
+    await cmd.run(args)
+
+    expect(deps.switchLiveModel).toHaveBeenCalledWith({ provider: 'live-provider', model: 'live-model', reasoningEffort: 'max' })
+    expect(saveSelection).not.toHaveBeenCalled()
+  })
+
   it('/effort max default 才 saveSelection', async () => {
     const { cmd, deps } = effortByName()
     const { saveSelection, ctx } = effortCtx()

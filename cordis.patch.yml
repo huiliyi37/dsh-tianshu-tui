@@ -6,16 +6,16 @@
 # 0.2.0：官方 `dsh-agent-presets`（文件根花名册）退场，改为
 # `dsh-agent-preset-registry`（声明注册表）+ 每预设一条 `dsh-agent-preset`
 # 声明行（声明式插件列表）。`agentPresets` 服务名与 mount/composeFrom/recompose
-# 接缝不变（preset-join.ts 的鸭式面继续命中）。预设声明与官方 web-app 0.2.1-rc.4
+# 接缝不变（preset-join.ts 的鸭式面继续命中）。预设声明与官方 web-app 0.2.2-rc.1
 # presets/*.patch.yml 对齐；schedule 行按下方宿主约束裁剪。
 
 - insert:
     - id: tui-runner
       name: '@huiliyi37/dsh-tianshu-tui'
 
-    # rc.1 起 standard preset 的 tool-subagent 行开 modelSelectionSettings: true，
-    # 要求 Host scope 有 model-selection-settings 服务（官方 web-app 有、dsh-base
-    # 无）——不挂则 standard 挂载整体失败、会话无工具面。shipped 组成默认关。
+    # 0.2.2-rc.1 的 modelSelection/modelDiscovery 与 Host 偏好采样解耦。
+    # 此服务在 Agent 创建时读取 subagent-model-selection 授权（官方 web-app 同款；
+    # base 无此服务，TUI 显式挂载），不再是工具安装的 mount 前置条件。
     - id: subagent-model-selection-settings
       name: '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
 
@@ -26,7 +26,7 @@
     - id: cordis-inspect-providers
       name: '@deepseek-ai/dsh-tool-cordis/host'
 
-    # 0.2.1 的 schedule 工具依赖 Web sessionController；base TUI 不挂该服务，
+    # 0.2.2-rc.1 的 schedule 工具依赖 Web sessionController；base TUI 不挂该服务，
     # 因此 standard/ptc/cordis 不同步 schedule 行，避免 Loader 永久 pending。
 
     # LSP 模型工具面（任务6对齐，2026-08-27）：tianshu-public 三件套——
@@ -56,13 +56,13 @@
     - id: tool-lsp
       name: '@huiliyi37/dsh-tool-lsp'
 
-    # The preset selection registry（对标 web-app 0.2.1 cordis.patch.yml 尾行）。
+    # The preset selection registry（对标 web-app 0.2.2-rc.1 cordis.patch.yml 尾行）。
     - id: agent-preset-registry
       name: '@deepseek-ai/dsh-agent-preset-registry'
       config:
         default: standard
 
-    # ── shipped 预设声明（与官方 web-app 0.2.1-rc.4 presets/ 对齐，schedule 除外）
+    # ── shipped 预设声明（与官方 web-app 0.2.2-rc.1 presets/ 对齐，schedule 除外）
 
     - id: preset-standard
       name: '@deepseek-ai/dsh-agent-preset'
@@ -88,6 +88,8 @@
             disabled: !!js process.platform !== 'win32'
           - id: tool-fs
             name: '@deepseek-ai/dsh-tool-fs'
+            config:
+              applyPatch: false
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
             config:
@@ -148,14 +150,13 @@
             config:
               - id: tool-subagent-control
                 name: '@deepseek-ai/dsh-tool-subagent-control'
-              - id: tool-subagent-list-agents
-                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
               - id: tool-subagent
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
                   provider: spawn
                   toolName: subagent
-                  modelSelectionSettings: true
+                  modelSelection: true
+                  modelDiscovery: true
               - id: tool-subagent-fork
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
@@ -182,7 +183,7 @@
             name: '@deepseek-ai/dsh-tool-present'
           - id: tool-plugin-manager
             name: '@deepseek-ai/dsh-plugin-manager/tools'
-            disabled: true
+            disabled: !!js "!ctx.get('profileContext')"
           - id: tool-plugin-market
             name: '@deepseek-ai/dsh-plugin-market/tools'
             disabled: true
@@ -211,6 +212,8 @@
             disabled: !!js process.platform !== 'win32'
           - id: tool-fs
             name: '@deepseek-ai/dsh-tool-fs'
+            config:
+              applyPatch: false
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
             config:
@@ -271,14 +274,13 @@
             config:
               - id: tool-subagent-control
                 name: '@deepseek-ai/dsh-tool-subagent-control'
-              - id: tool-subagent-list-agents
-                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
               - id: tool-subagent
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
                   provider: spawn
                   toolName: subagent
-                  modelSelectionSettings: true
+                  modelSelection: true
+                  modelDiscovery: true
               - id: tool-subagent-fork
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
@@ -303,10 +305,8 @@
             config:
               fetch: true
               searchTimeoutMs: 60000
-          - id: tool-presentation
-            name: '@deepseek-ai/dsh-agent-tool-presentation'
-            config:
-              mode: ptc
+          - id: tool-executor-ptc
+            name: '@deepseek-ai/dsh-tool-executor-ptc'
           - id: present
             name: '@deepseek-ai/dsh-tool-present'
           - id: tool-plugin-manager
@@ -418,6 +418,8 @@
             disabled: !!js process.platform !== 'win32'
           - id: tool-fs
             name: '@deepseek-ai/dsh-tool-fs'
+            config:
+              applyPatch: false
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
             config:
@@ -474,14 +476,13 @@
             config:
               - id: tool-subagent-control
                 name: '@deepseek-ai/dsh-tool-subagent-control'
-              - id: tool-subagent-list-agents
-                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
               - id: tool-subagent
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
                   provider: spawn
                   toolName: subagent
-                  modelSelectionSettings: true
+                  modelSelection: true
+                  modelDiscovery: true
               - id: tool-subagent-fork
                 name: '@deepseek-ai/dsh-tool-subagent'
                 config:
@@ -523,7 +524,7 @@
             disabled: !!js "!ctx.get('profileContext')"
 
 # ── agent plane leaves the host (standard preset remounts these) ───────────
-# 与官方 web-app 0.2.1 的 agent-plane 禁用清单对齐：注册表/存储类留在 host，
+# 与官方 web-app 0.2.2-rc.1 的 agent-plane 禁用清单对齐：注册表/存储类留在 host，
 # 模型面行由预设再挂。0.2.0 起 base 已无 tool-str-replace-editor 与
 # workflow-worker-thread 行（后者由 workflow-ptc 取代），相应禁用行移除；
 # 新增 tool-plugin-manager 与 command-goal 两行（web-app 同款）。
@@ -571,9 +572,6 @@
   disabled: true
 
 - id: tool-subagent-control
-  disabled: true
-
-- id: tool-subagent-list-agents
   disabled: true
 
 - id: tool-subagent

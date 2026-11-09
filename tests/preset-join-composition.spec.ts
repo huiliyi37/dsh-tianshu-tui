@@ -1,10 +1,11 @@
 /**
  * preset-join 真实装配：0.2.0 预设架构（dsh-agent-preset-registry 花名册 +
  * dsh-agent-preset 声明行）下，create/setup 挂载后 composedPreset === 'standard'，
- * 经 TUI /session new 的新会话同样 join 到 standard。不依赖 CLI 注入的
- * shipped 根——测试自备声明式空 composition（plugins: [] 合法），只钉
- * join/mount 接线。
+ * 经 TUI /session new 的新会话同样 join 到 standard。standard 的工具声明
+ * 直接读取本包 cordis.patch.yml 的 tool-jobs 行，继续验证 scoped schema、
+ * presenter 与 native executor 的真实 job_list 调用，不用 plugins: [] 代替。
  *
+ * 0.2.2-rc.1：Host 补 dsh-tool-executor-native，Loader builtins 补 group。
  * 0.2.0 适配注记：
  * - dsh-agent-presets（临时目录 + agent.cordis.yml + config.roots）不存在了。
  *   替代：registry（Config { default, selectedDefault? }，inject
@@ -19,25 +20,30 @@
  *   delegationDepth 必填）。
  */
 import { EventEmitter } from 'node:events'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
+import Group from '@deepseek-ai/cordis-plugin-group'
 import type { ReadStream, WriteStream } from 'node:tty'
 import CredentialsLocal from '@deepseek-ai/dsh-credentials-local'
 import UserApproval from '@deepseek-ai/dsh-user-approval'
 import UserQuestions from '@deepseek-ai/dsh-user-questions'
-import Llm from '@deepseek-ai/dsh-llm'
+import Llm, { ToolCallId } from '@deepseek-ai/dsh-llm'
 import * as LlmReplay from '@deepseek-ai/dsh-llm-replay'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjection from '@deepseek-ai/dsh-session-projection'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import Tools from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
+import JobsLocal from '@deepseek-ai/dsh-jobs-local'
+import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
 import Subagent from '@deepseek-ai/dsh-subagent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -45,6 +51,41 @@ import AgentPresetRegistry from '@deepseek-ai/dsh-agent-preset-registry'
 import AgentPreset from '@deepseek-ai/dsh-agent-preset'
 import * as Tui from '../src/index.js'
 import { joinPreset, presetJoinFacet } from '../src/adapter/preset-join.js'
+import { resolveToolViews } from '../src/adapter/tool-view.js'
+
+interface EntryRow {
+  id?: string
+  name?: string
+  config?: unknown
+}
+
+const yaml = createRequire(import.meta.url)('js-yaml') as {
+  Type: new (tag: string, options: Record<string, unknown>) => unknown
+  JSON_SCHEMA: { extend(type: unknown): unknown }
+  load(content: string, options: { schema: unknown }): unknown
+  dump(value: unknown, options: { schema: unknown }): string
+}
+const JsExpr = new yaml.Type('tag:yaml.org,2002:js', {
+  kind: 'scalar',
+  resolve: (data: unknown) => typeof data === 'string',
+  construct: (data: string) => ({ __jsExpr: data }),
+})
+const entryListSchema = yaml.JSON_SCHEMA.extend(JsExpr)
+const PATCH_PATH = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))
+
+async function shippedToolJobsRow(): Promise<EntryRow> {
+  const patch = yaml.load(await readFile(PATCH_PATH, 'utf8'), { schema: entryListSchema }) as Array<{ insert?: EntryRow[] }>
+  const standard = patch.flatMap(entry => entry.insert ?? []).find(entry => entry.id === 'preset-standard')
+  const config = standard?.config as { plugins?: EntryRow[] } | undefined
+  const row = config?.plugins?.find(entry => entry.id === 'tool-jobs' && entry.name === '@deepseek-ai/dsh-tool-jobs')
+  if (row === undefined) throw new Error('standard preset must declare the shipped tool-jobs row')
+  return row
+}
+
+function indentBlock(text: string, spaces: number): string {
+  const prefix = ' '.repeat(spaces)
+  return text.trimEnd().split('\n').map(line => `${prefix}${line}`).join('\n')
+}
 
 function makeStdout(): { stream: WriteStream; text(): string } {
   const chunks: string[] = []
@@ -100,6 +141,7 @@ describe('preset-join real composition', () => {
     const stdout = makeStdout()
     const stdin = makeStdin()
     const configPath = join(root, 'cordis.yml')
+    const toolJobsRow = await shippedToolJobsRow()
     await writeFile(configPath, [
       // settings 缺席：dsh-settings 需要 profileContext（真实 profile 启动才有），
       // 组合测试激活不了；TUI 对未注册服务跳过等待（waitForServicesReady）。
@@ -128,8 +170,12 @@ describe('preset-join real composition', () => {
       "  name: '@deepseek-ai/dsh-agent'",
       '- id: system-prompt',
       "  name: '@deepseek-ai/dsh-system-prompt'",
+      '- id: jobs',
+      "  name: '@deepseek-ai/dsh-jobs-local'",
       '- id: tools',
       "  name: '@deepseek-ai/dsh-tools'",
+      '- id: tool-executor-native',
+      "  name: '@deepseek-ai/dsh-tool-executor-native'",
       '- id: agent-default-model',
       "  name: '@deepseek-ai/dsh-agent-default-model'",
       '  config:',
@@ -139,7 +185,7 @@ describe('preset-join real composition', () => {
       "  name: '@deepseek-ai/dsh-subagent'",
       '- id: agent-loop',
       "  name: '@deepseek-ai/dsh-agent-loop'",
-      // 0.2.0 声明式预设：花名册（default 指认）+ 一行预设声明（空插件列表合法）。
+      // 真实 cordis.patch.yml 的 standard tool-jobs 行，覆盖 scoped 工具面与 native 执行。
       '- id: agent-presets',
       "  name: '@deepseek-ai/dsh-agent-preset-registry'",
       '  config:',
@@ -148,7 +194,7 @@ describe('preset-join real composition', () => {
       "  name: '@deepseek-ai/dsh-agent-preset'",
       '  config:',
       '    id: standard',
-      '    plugins: []',
+      indentBlock(yaml.dump({ plugins: [toolJobsRow] }, { schema: entryListSchema }), 4),
       '- id: tui-runner',
       "  name: '@huiliyi37/dsh-tianshu-tui'",
       '',
@@ -171,6 +217,9 @@ describe('preset-join real composition', () => {
       ['@deepseek-ai/dsh-agent', AgentRegistry],
       ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
       ['@deepseek-ai/dsh-tools', Tools],
+      ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
+      ['@deepseek-ai/dsh-jobs-local', JobsLocal],
+      ['@deepseek-ai/dsh-tool-jobs', ToolJobs],
       ['@deepseek-ai/dsh-agent-default-model', AgentDefaultModel],
       ['@deepseek-ai/dsh-subagent', Subagent],
       ['@deepseek-ai/dsh-agent-loop', AgentLoop],
@@ -183,6 +232,7 @@ describe('preset-join real composition', () => {
     context = ctx
     ctx.baseUrl = pathToFileURL(root).href + '/'
     await ctx.plugin(Loader)
+    ctx.loader.builtins.group = Group
     ctx.loader.builtins.include = Include
     ctx.loader.internal = {
       version: 'v2',
@@ -219,6 +269,26 @@ describe('preset-join real composition', () => {
       },
     })
     expect(roster!.composedPreset!(created.agent.ctx)).toBe('standard')
+
+    const scopedNames = ctx.tools.schemas(created.agent).map(schema => schema.name)
+    expect(scopedNames).toEqual(expect.arrayContaining(['job_list', 'job_output', 'job_kill']))
+    expect(ctx.tools.schemas().map(schema => schema.name)).not.toContain('job_list')
+    expect(resolveToolViews(ctx.tools, {
+      name: 'job_list',
+      argumentsRaw: '{}',
+      scope: created.agent,
+    }).call).toMatchObject({ card: 'generic', title: 'List background jobs' })
+
+    const batch = await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: ToolCallId('job-list-1'), name: 'job_list', arguments: '{}' }],
+      signal: new AbortController().signal,
+      agent: created.agent,
+    })
+    expect(batch.results).toHaveLength(1)
+    expect(batch.results[0]?.result).toMatchObject({
+      isError: false,
+      content: [{ type: 'text', text: '(no background jobs)' }],
+    })
 
     const before = new Set(ctx.sessions.list().map(s => String(s.id)))
     stdin.stream.emit('data', '/session new')

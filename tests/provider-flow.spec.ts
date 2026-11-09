@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { SettingsConflictError, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { ProviderFlow } from '../src/ui/provider-flow.js'
 import { ProviderEditorController, type ProviderEditorSession } from '../src/ui/provider-editor.js'
 import type { OverlayController } from '../src/engine/overlay-controller.js'
@@ -211,6 +212,34 @@ describe('ProviderFlow — 创建、发现与两段保存', () => {
     second.draft.profile.baseURL = 'https://acme.test/v1'
     expect(await second.save(second.draft)).toEqual({ kind: 'profile-error', message: 'settings conflict' })
     expect(credentialSet).not.toHaveBeenCalled()
+  })
+
+  it('真实 SettingsConflictError 原样可见，不写 credentials 或明文 key 到 settings', async () => {
+    const conflict = new SettingsConflictError('llm-pi-ai' as SettingsNamespace, 3, 4)
+    const mutate = vi.fn(async () => { throw conflict })
+    const credentialSet = vi.fn(async () => {})
+    const { flow, open, onSaved } = makeFlow({
+      settings: {
+        describe: () => [{ ns: 'llm-pi-ai', value: { providers: {} }, user: { providers: {} }, revision: 3 }],
+        mutate,
+      },
+      credentials: { describe: vi.fn(async () => ({ writable: true })), set: credentialSet },
+    })
+    await flow.openCreate()
+    const session = sessionOf(open)
+    Object.assign(session.draft, { route: 'acme', models: [{ id: 'm' }], keyDraft: 'sk-secret' })
+    session.draft.profile.baseURL = 'https://acme.test/v1'
+    expect(conflict).toMatchObject({ name: 'SettingsConflictError', code: 'SETTINGS_CONFLICT', expected: 3, actual: 4 })
+    expect(await session.save(session.draft)).toEqual({ kind: 'profile-error', message: conflict.message })
+    expect(mutate).toHaveBeenCalledWith('llm-pi-ai', [{
+      op: 'set', path: ['providers', 'acme'],
+      value: {
+        api: 'openai-completions', baseURL: 'https://acme.test/v1', models: [{ id: 'm' }], apiKeyEnv: 'ACME_API_KEY',
+      },
+    }], 3)
+    expect(credentialSet).not.toHaveBeenCalled()
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(JSON.stringify(mutate.mock.calls)).not.toContain('sk-secret')
   })
 })
 

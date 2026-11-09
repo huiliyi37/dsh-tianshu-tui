@@ -7,7 +7,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId, type Session } from '@deepseek-ai/dsh-session'
-import { installModelSelection, type AgentHandle, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
+import { installModelSelection, type AgentHandle } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import { randomUUID } from 'node:crypto'
 import { resumeModelSelection } from '../controllers/session-manager.js'
@@ -17,7 +17,6 @@ import { joinPreset, presetJoinFacet } from './preset-join.js'
 export interface ForkedAgent {
   childId: SessionId
   handle: AgentHandle
-  ref: ModelSelectionRef
 }
 
 /**
@@ -34,22 +33,22 @@ export async function createForkedAgent(
   fallbackCwd: string,
 ): Promise<ForkedAgent> {
   const spec = forkAgentSpec(parent, fallbackCwd, parentSessionId)
-  const persisted = parent.requestHeader()?.config
-  const selection: ModelSelection = resumeModelSelection(
-    persisted,
+  const parentAgent = ctx.agents.get(parentSessionId)
+  // live Agent 的 pending 选择优先；seed 由 AgentModel 自己折出 pending/lastUsed，
+  // agentOptions 只兜底 options-only 或 registry 中已不存在父 agent 的情况。
+  const selection = parentAgent?.model?.current() ?? resumeModelSelection(
+    parent.requestHeader()?.config,
     () => ctx.agentDefaultModel.currentSelection(),
   )
-  const ref: ModelSelectionRef = { current: selection, assembled: undefined }
   const childId = SessionId(`session-${randomUUID()}`)
   const handle = await ctx.agents.create({
     sessionId: childId,
     seed: spec.seed,
     meta: spec.meta,
     inheritedEventCount: spec.inheritedEventCount,
-    agentOptions: { provider: selection.provider, model: selection.model },
+    agentOptions: { ...selection },
     setup: async (agentCtx) => {
-      installModelSelection(agentCtx, ref)
-      const parentAgent = ctx.agents.get(parentSessionId)
+      installModelSelection(agentCtx)
       await joinPreset({
         facet: presetJoinFacet(ctx),
         agentCtx,
@@ -58,5 +57,5 @@ export async function createForkedAgent(
       })
     },
   })
-  return { childId, handle, ref }
+  return { childId, handle }
 }

@@ -10,6 +10,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { BtwController, completedTurnSeed } from '../src/controllers/btw-controller.js'
 import type { AgentHandle } from '@deepseek-ai/dsh-agent'
@@ -53,6 +54,7 @@ function makeCtx(overrides: {
       get: vi.fn(() => ({
         events: overrides.events ?? [],
         snapshotEvents(this: { events?: unknown[] }) { return this.events ?? [] },
+        requestHeader: vi.fn(() => undefined),
         header: overrides.header ?? { id: ACTIVE, version: 0, createdAt: 1, isSeeded: false },
       })),
     },
@@ -155,12 +157,15 @@ describe('BtwController', () => {
     const composeFrom = vi.fn(() => 'standard')
     const parentCtx = { parent: 1 }
     const { ctx, handle } = makeCtx({ events })
-    ctx.agents.get.mockReturnValue({ ctx: parentCtx })
+    ctx.agents.get.mockReturnValue({
+      ctx: parentCtx,
+      model: { current: vi.fn(() => ({ provider: 'mock', model: 'mock' })) },
+    })
     ctx.reflect.get.mockImplementation((name: string) => (
       name === 'agentPresets' ? { mount: vi.fn(), composeFrom } : undefined
     ))
-    ctx.agents.create.mockImplementation(async (opts: { setup?: (c: unknown) => void | Promise<void> }) => {
-      await opts.setup?.({ child: 1 })
+    ctx.agents.create.mockImplementation(async (opts: { setup?: (c: unknown, a: unknown) => void | Promise<void> }) => {
+      await opts.setup?.({ child: 1 }, { model: { select: vi.fn() } })
       return handle
     })
     const controller = new BtwController({
@@ -170,6 +175,31 @@ describe('BtwController', () => {
     })
     await controller.ask('q')
     expect(composeFrom).toHaveBeenCalledWith({ child: 1 }, parentCtx)
+    controller.dispose()
+  })
+
+  it('ask 显式 select 父 Agent 的 pending route+effort，覆盖 seed 旧 header', async () => {
+    const pending = { provider: 'parent-p', model: 'pending-m', reasoningEffort: ReasoningEffortId('low') }
+    const { ctx, handle } = makeCtx()
+    const select = vi.fn()
+    ctx.agents.get.mockReturnValue({
+      model: { current: vi.fn(() => pending) },
+    })
+    ctx.agents.create.mockImplementation(async (opts: { setup?: (c: unknown, a: unknown) => void | Promise<void> }) => {
+      await opts.setup?.({}, { model: { select } })
+      return handle
+    })
+    const controller = new BtwController({
+      ctx,
+      activeSessionId: () => ACTIVE,
+      timeoutMs: 1000,
+    })
+
+    await controller.ask('q')
+
+    expect(ctx.agents.create).toHaveBeenCalledWith(expect.objectContaining({ agentOptions: pending }))
+    expect(select).toHaveBeenCalledWith(pending)
+    expect(ctx.agentDefaultModel.currentSelection).not.toHaveBeenCalled()
     controller.dispose()
   })
 

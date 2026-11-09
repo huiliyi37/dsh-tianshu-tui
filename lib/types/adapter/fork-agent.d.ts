@@ -6,11 +6,10 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import { SessionId, type Session } from '@deepseek-ai/dsh-session';
-import { type AgentHandle, type ModelSelectionRef } from '@deepseek-ai/dsh-agent';
+import { type AgentHandle } from '@deepseek-ai/dsh-agent';
 export interface ForkedAgent {
     childId: SessionId;
     handle: AgentHandle;
-    ref: ModelSelectionRef;
 }
 /**
  * 从父会话铸一个带历史的 child agent（create 失败不改父会话）。

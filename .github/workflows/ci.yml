@@ -1,7 +1,7 @@
 name: CI
 
 # 四门禁（lint + typecheck + test + build）。lockfile 已跟踪，npm ci 可复现。
-# node 矩阵对齐 engines（^22.19 || >=24）；os 矩阵含 windows-latest——Windows
+# node 矩阵对齐 engines（>=24.9.0）；os 矩阵含 windows-latest——Windows
 # 是一等目标平台（Ctrl+C/路径容错等兼容修复自 rc.10 起），spec 需在真 Windows 回归。
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node-version: ['22', '24']
+        node-version: ['24.9.0', '24']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

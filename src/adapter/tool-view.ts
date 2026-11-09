@@ -10,6 +10,7 @@
  * @module @deepseek-ai/dsh-tianshu-tui/adapter/tool-view
  */
 
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ToolCallView, ToolResult, ToolResultView } from '@deepseek-ai/dsh-tools'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -22,9 +23,10 @@ export interface ToolPresenterSource {
   /**
    * 名字查工具定义（ToolService.get 的结构子集）。
    * @param name - 工具名（模型原样产出）。
+   * @param scope - 调用所属 Agent；缺省按全局视图查询。
    * @returns 工具定义的 presenter 面；未注册返回 undefined。
    */
-  get(name: string): {
+  get(name: string, scope?: Agent): {
     presentCall?(args: unknown): ToolCallView | undefined
     presentResult?(args: unknown, result: ToolResult): ToolResultView | undefined
   } | undefined
@@ -42,6 +44,8 @@ export interface ResolvedToolViews {
 export interface ToolViewRequest {
   /** 工具名（模型原样产出）。 */
   name: string
+  /** 调用所属 Agent；缺省按全局视图查询，preset/scoped 工具可能因此降级为无意图。 */
+  scope?: Agent
   /** 原始参数 JSON 字符串（模型原样产出，桥内解析）。 */
   argumentsRaw: string
   /** 已结算结果；进行中调用缺省（只解析 presentCall）。 */
@@ -66,7 +70,7 @@ export function resolveToolViews(
   request: ToolViewRequest,
 ): ResolvedToolViews {
   if (tools === undefined) return {}
-  const definition = tools.get(request.name)
+  const definition = tools.get(request.name, request.scope)
   if (definition === undefined) return {}
   try {
     const args: unknown = JSON.parse(request.argumentsRaw)

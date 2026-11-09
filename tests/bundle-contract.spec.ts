@@ -44,7 +44,9 @@ function importSpecifiers(code: string): string[] {
 
 describe('published bundle contract', () => {
   const pkg = JSON.parse(readRepo('package.json')) as {
+    engines: { node: string }
     peerDependencies: Record<string, string>
+    devDependencies: Record<string, string>
     dependencies: Record<string, string>
   }
   const allowedDeepseek = new Set(Object.keys(pkg.peerDependencies))
@@ -72,6 +74,47 @@ describe('published bundle contract', () => {
     })
   }
 
+  it('宿主包与工具链精确对齐 0.2.2-rc.1', () => {
+    for (const section of ['peerDependencies', 'devDependencies', 'dependencies'] as const) {
+      for (const [name, version] of Object.entries(pkg[section])) {
+        if (name.startsWith('@deepseek-ai/dsh-')) {
+          expect(version, `${section}.${name}`).toBe('0.2.2-rc.1')
+        }
+      }
+    }
+    expect(pkg.engines.node).toBe('>=24.9.0')
+    expect(pkg.peerDependencies['@deepseek-ai/cordis']).toBe('~4.1.0')
+    expect(pkg.devDependencies['@deepseek-ai/cordis']).toBe('~4.1.0')
+    expect(pkg.devDependencies['@deepseek-ai/cordis-plugin-include']).toBe('~1.1.0')
+    expect(pkg.devDependencies['@deepseek-ai/cordis-plugin-loader']).toBe('~1.1.0')
+    expect(pkg.devDependencies['@deepseek-ai/cordis-plugin-timer']).toBe('~1.2.0')
+    expect(pkg.devDependencies['@deepseek-ai/schemastery']).toBe('~3.19.0')
+    expect(pkg.dependencies['node-addon-require-builtin']).toBe('^0.1.9')
+  })
+
+  it('PTC executor 随包发布，native/group 仅用于测试组合', () => {
+    expect(pkg.dependencies['@deepseek-ai/dsh-tool-executor-ptc']).toBe('0.2.2-rc.1')
+    expect(pkg.devDependencies['@deepseek-ai/dsh-tool-executor-native']).toBe('0.2.2-rc.1')
+    expect(pkg.devDependencies['@deepseek-ai/cordis-plugin-group']).toBe('~1.1.0')
+  })
+
+  it('invariant companion 保持无官方服务依赖的兼容 no-op', async () => {
+    expect(pkg.peerDependencies['@deepseek-ai/dsh-invariants']).toBeUndefined()
+    expect(pkg.devDependencies['@deepseek-ai/dsh-invariants']).toBeUndefined()
+    expect(pkg.dependencies['@huiliyi37/dsh-invariants']).toBe('0.8.0')
+    expect(readRepo('src/invariant.ts')).not.toContain('@deepseek-ai/dsh-invariants')
+    expect(readRepo('lib/invariant.js')).not.toContain('@deepseek-ai/dsh-invariants')
+    const invariantUrl = new URL('../lib/invariant.js', import.meta.url).href
+    const companion = (await import(invariantUrl)) as {
+      inject: string[]
+      apply: () => Promise<() => void>
+    }
+    expect(companion.inject).toEqual([])
+    const dispose = await companion.apply()
+    expect(dispose).toBeTypeOf('function')
+    expect(dispose()).toBeUndefined()
+  })
+
   it('#47 本包 patch 挂 agent-preset-registry 并关掉 host agent 面（对标 web）', () => {
     const patch = readRepo('cordis.patch.yml')
     const pkg = JSON.parse(readRepo('package.json')) as {
@@ -98,10 +141,17 @@ describe('published bundle contract', () => {
       '@deepseek-ai/dsh-plugin-market',
       '@deepseek-ai/dsh-time-context',
       '@deepseek-ai/dsh-tool-cordis',
+      '@deepseek-ai/dsh-tool-executor-ptc',
     ]) {
-      expect(pkg.dependencies?.[name], `${name} must ship with the profile bundle`).toBe('0.2.1-rc.4')
+      expect(pkg.dependencies?.[name], `${name} must ship with the profile bundle`).toBe('0.2.2-rc.1')
     }
   })
+
+  for (const forbidden of ['list-agents', 'modelSelectionSettings', 'tool-presentation']) {
+    it(`legacy preset entry is forbidden: ${forbidden}`, () => {
+      expect(readRepo('cordis.patch.yml')).not.toContain(forbidden)
+    })
+  }
 
   it('官方预设注册表可解析时（无则跳过）不声明自己的 bundle.patch', async () => {
     let manifest: { dsh?: { bundle?: { patch?: string } } }

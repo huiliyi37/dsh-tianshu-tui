@@ -15,7 +15,7 @@
  * 未绑定脚本）。主会话 attach 不驱动模型调用，btw 会话是第一个调用者 →
  * 拿 scripts[0]。fixture 事件只需 turn/step + assistant/attempt
  * （deriveReplayScript 从 assistant/attempt 的 stream 推导 StreamChunk 列表，
- * finish 结尾）。
+ * finish 结尾）。0.2.2-rc.1：Host 补 dsh-tool-executor-native，Loader builtins 补 group。
  *
  * 0.2.0 适配注记：
  * - dsh-settings-file / dsh-agent-spine-demo 均不存在了；settings 是 TUI 的
@@ -36,6 +36,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
+import Group from '@deepseek-ai/cordis-plugin-group'
 import type { ReadStream, WriteStream } from 'node:tty'
 import CredentialsLocal from '@deepseek-ai/dsh-credentials-local'
 import UserApproval from '@deepseek-ai/dsh-user-approval'
@@ -47,6 +48,7 @@ import SessionProjection from '@deepseek-ai/dsh-session-projection'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import Tools from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
 import Subagent from '@deepseek-ai/dsh-subagent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
@@ -161,6 +163,8 @@ export async function boot(): Promise<Booted> {
     "  name: '@deepseek-ai/dsh-system-prompt'",
     '- id: tools',
     "  name: '@deepseek-ai/dsh-tools'",
+    '- id: tool-executor-native',
+    "  name: '@deepseek-ai/dsh-tool-executor-native'",
     '- id: agent-default-model',
     "  name: '@deepseek-ai/dsh-agent-default-model'",
     '  config:',
@@ -192,6 +196,7 @@ export async function boot(): Promise<Booted> {
     ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', Tools],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-agent-default-model', AgentDefaultModel],
     ['@deepseek-ai/dsh-subagent', Subagent],
     ['@deepseek-ai/dsh-agent-loop', AgentLoop],
@@ -202,6 +207,7 @@ export async function boot(): Promise<Booted> {
   context = ctx
   ctx.baseUrl = pathToFileURL(root).href + '/'
   await ctx.plugin(Loader)
+  ctx.loader.builtins.group = Group
   ctx.loader.builtins.include = Include
   ctx.loader.internal = {
     version: 'v2',

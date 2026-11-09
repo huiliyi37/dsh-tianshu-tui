@@ -478,11 +478,11 @@ describe('KeyFlow — 供应商参数化 target', () => {
     expect(credentials.set).toHaveBeenCalledWith('OPENROUTER_API_KEY', 'k1')
   })
 
-  it('profile 未声明 apiKeyEnv + settings 在场 → afterSave 挂载：保存后 mutate 补写 apiKeyEnv', async () => {
+  it('profile 未声明 apiKeyEnv + settings 在场 → afterSave 按同快照 revision 补写引用', async () => {
     const credentials = makeCredentials()
     const mutate = vi.fn(async () => {})
     const settings = {
-      describe: () => [{ ns: 'llm-pi-ai', value: { providers: { openrouter: {} } } }],
+      describe: () => [{ ns: 'llm-pi-ai', value: { providers: { openrouter: {} } }, revision: 17 }],
       mutate,
     }
     const { flow, dialog } = makeFlow({
@@ -506,7 +506,43 @@ describe('KeyFlow — 供应商参数化 target', () => {
       op: 'set',
       path: ['providers', 'openrouter', 'apiKeyEnv'],
       value: 'OPENROUTER_API_KEY',
-    }])
+    }], 17)
+  })
+
+  it('afterSave SETTINGS_CONFLICT 可见且不报成功，settings 不接触明文 key', async () => {
+    const credentials = makeCredentials()
+    const conflict = Object.assign(new Error(
+      'settings namespace "llm-pi-ai" changed since it was read (expected revision 17, now 18)',
+    ), { code: 'SETTINGS_CONFLICT', expected: 17, actual: 18 })
+    const mutate = vi.fn(async () => { throw conflict })
+    const settings = {
+      describe: vi.fn(() => [{ ns: 'llm-pi-ai', value: { providers: { openrouter: {} } }, revision: 17 }]),
+      mutate,
+    }
+    const { flow, dialog } = makeFlow({
+      reflectGet: (name) => {
+        if (name === 'llm') return { listConfigurableProviders: () => DIRECTORY, discoverModels: async () => [] }
+        if (name === 'credentials') return credentials
+        if (name === 'settings') return settings
+        return undefined
+      },
+    })
+    await flow.openKeyDialogForEntry(DIRECTORY[1], credentials)
+    for (const char of 'sk-secret') dialog.handleKey('unknown', char)
+    dialog.handleKey('return', '')
+    await settle()
+    await settle()
+    expect(settings.describe).toHaveBeenCalledTimes(1)
+    expect(mutate).toHaveBeenCalledWith('llm-pi-ai', [{
+      op: 'set', path: ['providers', 'openrouter', 'apiKeyEnv'], value: 'OPENROUTER_API_KEY',
+    }], 17)
+    expect(credentials.set).toHaveBeenCalledWith('OPENROUTER_API_KEY', 'sk-secret')
+    expect(JSON.stringify(mutate.mock.calls)).not.toContain('sk-secret')
+    const text = dialog.render(200, 24).join('\n')
+    expect(text).toContain('SETTINGS_CONFLICT')
+    expect(text).toContain('expected revision 17, now 18')
+    expect(text).not.toContain('✓ 已保存并生效')
+    expect(text).not.toContain('sk-secret')
   })
 
   it('llm-deepseek 段 → 探测走真实 probeDeepSeekKey（settingsNs 判据，fetch 外部边界打桩）', async () => {
@@ -610,6 +646,58 @@ describe('KeyFlow — 供应商参数化 target', () => {
     await settle()
     expect(discoverModels).toHaveBeenCalledWith('llm-pi-ai', { provider: 'openrouter', apiKey: 'k' })
     expect(credentials.set).not.toHaveBeenCalled()
+  })
+
+  it.each([401, 403] as const)('DISCOVERY_FAILED HTTP %i → invalid 拒存且不泄露明文 key', async (status) => {
+    const credentials = makeCredentials()
+    const discoverModels = vi.fn(async () => {
+      throw Object.assign(new Error(`http://gateway.test/v1/models answered ${status}; check the API key`), {
+        code: 'DISCOVERY_FAILED',
+      })
+    })
+    const { flow, dialog } = makeFlow({
+      reflectGet: (name) => {
+        if (name === 'llm') return { listConfigurableProviders: () => DIRECTORY, discoverModels }
+        if (name === 'credentials') return credentials
+        return undefined
+      },
+    })
+    await flow.openKeyDialogForEntry({ ...DIRECTORY[1]!, declared: true }, credentials)
+    for (const char of 'sk-secret') dialog.handleKey('unknown', char)
+    dialog.handleKey('return', '')
+    await settle()
+    await settle()
+    expect(credentials.set).not.toHaveBeenCalled()
+    const text = dialog.render(100, 24).join('\n')
+    expect(text).toContain('Key 无效（401/403）')
+    expect(text).not.toContain('无法验证')
+    expect(text).not.toContain('sk-secret')
+  })
+
+  it.each([
+    { kind: 'HTTP 500', error: Object.assign(new Error('http://gateway.test/v1/models answered 500'), { code: 'DISCOVERY_FAILED' }) },
+    { kind: '网络错误', error: Object.assign(new Error('could not reach http://gateway.test/v1/models'), { code: 'DISCOVERY_FAILED' }) },
+    { kind: '超时取消', error: Object.assign(new Error('model discovery aborted by caller'), { code: 'ABORTED' }) },
+  ])('发现失败分类：$kind → unknown 确认态', async ({ error }) => {
+    const credentials = makeCredentials()
+    const discoverModels = vi.fn(async () => { throw error })
+    const { flow, dialog } = makeFlow({
+      reflectGet: (name) => {
+        if (name === 'llm') return { listConfigurableProviders: () => DIRECTORY, discoverModels }
+        if (name === 'credentials') return credentials
+        return undefined
+      },
+    })
+    await flow.openKeyDialogForEntry({ ...DIRECTORY[1]!, declared: true }, credentials)
+    dialog.handleKey('unknown', 'k')
+    dialog.handleKey('return', '')
+    await settle()
+    await settle()
+    expect(credentials.set).not.toHaveBeenCalled()
+    const text = dialog.render(100, 24).join('\n')
+    expect(text).toContain('无法验证')
+    expect(text).toContain('Enter 仍要保存')
+    expect(text).not.toContain('Key 无效（401/403）')
   })
 
   it('deepseek-account 直接入口也不会打开 API Key 保存对话框', async () => {

@@ -241,8 +241,8 @@ export declare class TuiApp {
     private taskSurfaceDisposer;
     /** T1.4：plan 投影 active 态（驱动 statusline [plan] 徽标；服务缺失时为 false）。 */
     private planState;
-    /** C2 项 4：当前会话的模型选择 ref（newSession/switchSession 挂载；registry 兜底为 null）。 */
-    private modelRef;
+    /** 当前 live Agent 的持久化模型面（新建、恢复、fork 及 registry 复用统一接线）。 */
+    private model;
     /** C2 项 2：历史搜索 overlay（Ctrl+F；attach 时注册，消息快照激活时提供）。 */
     private searchOverlay;
     private scrollPager;
@@ -467,8 +467,8 @@ export declare class TuiApp {
     private renderRestorableSessions;
     /**
      * 新建会话：经 ctx.agents.create 铸造 session+agent，本层持有 handle。
-     * 模型定路取 agentDefaultModel 当前选择（settings 用户层实时生效），并经
-     * installModelSelection 耦合 prompt 装配与请求路由（headless 同款接线）。
+     * 初始完整选择取 agentDefaultModel（含显式 reasoningEffort）；后续路由由
+     * handle.agent.model 持久化，installModelSelection 只安装切换提示。
      * 会话 id 由本层铸造（session-<uuid>），create 返回的 handle 由 ownedHandle 持有、
      * detach/dispose 时释放；controls 走 controlsFromHandle（驱动 handle.agent）。
      * 先卸载当前挂载（与 switchSession 对称）：否则 transcript/liveAgent/
@@ -480,11 +480,10 @@ export declare class TuiApp {
      */
     newSession(reuse?: SessionSummary): Promise<SessionId>;
     /**
-     * C2 项 4：热切当前会话的模型。改 modelRef.current——下一次 agent 步进
-     * （prompt assembly）自动生效，不中断当前步骤。registry 兜底的会话
-     * （ref 由其他装配方持有）返回 false，调用方提示不可热切。
-     * @param selection - 新的 provider/model。
-     * @returns 是否已热切（modelRef 存在）。
+     * 热切当前会话的模型：持久化完整选择，由下一个尚未开始准备的 step 使用。
+     * select 的 Session append 异常直接上抛，调用方经既有错误通道展示。
+     * @param selection - 新的 provider/model/可选显式 reasoningEffort。
+     * @returns 当前是否有 live Agent 可热切。
      */
     switchLiveModel(selection: ModelSelection): boolean;
     /** A3：create({ seed }) 铸 child；禁止 fork 后再 resume live 会话。 */
@@ -565,11 +564,9 @@ export declare class TuiApp {
      */
     private truncateSession;
     /**
-     * 切换到既有会话：卸载旧投影/控制面（并释放本层持有的旧 handle），
-     * 再 agent-ensure 目标会话——registry 有 live agent 走 controlsFromRegistry 兜底
-     * （非自有，不 dispose）；无则 resume 拿 handle（本层持有并 dispose）。
-     * resume 的模型定路沿用会话持久化的 request header（跨重启续模），
-     * 无 header（从未成功发起请求的会话）才落 agentDefaultModel 当前选择。
+     * 切换到既有会话：registry 有 live agent 直接复用其模型面；否则 resume 并持有 handle。
+     * agentOptions 只提供无持久化选择时的 fallback；AgentModel 自动恢复 pending/lastUsed，
+     * 普通 resume 不调 select()，避免默认路由覆盖尚未使用的选择。
      * 恢复先于任何切换状态提交：目标不可恢复时在此抛错，应用停留在原会话（不进入半切换态）。
      * @param id - 目标会话 id；live 会话或可恢复的持久化会话。
      */
@@ -767,6 +764,8 @@ export declare class TuiApp {
     private handleStreamEvent;
     /** tools 服务的 presenter 面（可选服务：未装配返回 undefined → 桥软降级）。 */
     private toolPresenters;
+    /** live/replay 共用当前 Agent scope；registry 中无对应 Agent 时保持文本降级。 */
+    private resolveToolViews;
     /**
      * 结算工具卡实时提交：从 transcript 查配对 call 的 name/arguments →
      * presenter 桥 → 卡片渲染 → 串行在流式文本 flush 之后 commit 进
@@ -809,8 +808,7 @@ export declare class TuiApp {
     /**
      * 卸载当前会话的投影与控制面，并按 opts 处理本层持有的 handle：
      * - keepHandle（P3 side conversation 切换）：所有权让渡 registry——agent
-     *   保持 live（可切回复用），退出时由 agent-loop factory 统一 teardown；
-     *   modelRef 同步让渡（registry 兜底语义：不可热切）。
+     *   保持 live（可切回复用并继续热切），退出时由 agent-loop factory 统一 teardown。
      * - 缺省（dispose 退出）：释放本层 handle（create/resume 铸造的）。
      * registry 兜底的裸 agent 非自有，两种情况都不 dispose。会话本身所有权归
      * 持有方，不销毁。

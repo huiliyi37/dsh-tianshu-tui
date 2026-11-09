@@ -26,12 +26,13 @@ export interface KeyWizardSettingsFacet {
         ns: string;
         value: unknown;
         user?: unknown;
+        revision?: number;
     }>;
     mutate(ns: string, ops: Array<{
         op: string;
         path: readonly string[];
         value: unknown;
-    }>): Promise<void>;
+    }>, expectedRevision?: number): Promise<void>;
 }
 /** key-flow 装配依赖（全部由 TuiApp 注入；null = 服务缺席，走降级路径）。 */
 export interface KeyFlowDeps {
@@ -104,6 +105,7 @@ export declare class KeyFlow {
     settingsMutationFacet(): KeyWizardSettingsFacet | undefined;
     /** 读取 settings 各命名空间的已解析值（ns 对象原样保留供 mutate 回传）。 */
     readResolvedSettingsSections(): Map<string, unknown>;
+    private readResolvedSettingsSnapshot;
     /** 读取原始用户层；字段是否由用户覆盖只能在这一层判断，不能看 resolved 默认值。 */
     readUserSettingsSections(): Map<string, unknown> | undefined;
     private readSettingsSections;
@@ -123,7 +125,7 @@ export declare class KeyFlow {
      * 自定义路由携带草稿 baseURL/api 走真实端点发现，成功才 ok。
      */
     private keyProbeFor;
-    /** 保存 key 后激活路由：写入最小 profile（settingsPath 非空 = pi-ai 路由）。 */
+    /** 保存 key 后激活路由：按打开对话框时的 describe 快照写入最小 profile。 */
     private activateRouteProfile;
     /** 当前 base 无 sessionController；按官方 groups 的 llm 数据源判定账号组非空。 */
     private deepSeekAccountAvailable;

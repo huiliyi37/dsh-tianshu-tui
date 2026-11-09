@@ -160,8 +160,8 @@ export function createEffortCommand(deps: StartupCommandDeps): SlashCommand {
         echo('⚠ agent-default-model 服务不可用')
         return
       }
-      const current = facet.currentSelection()
       const { rest, persist } = splitDefaultFlag(text)
+      const current = persist ? facet.currentSelection() : (deps.currentAgent()?.model.current() ?? facet.currentSelection())
       if (rest === '' && persist) {
         await facet.saveSelection(current)
         const label = current.reasoningEffort ?? 'auto'

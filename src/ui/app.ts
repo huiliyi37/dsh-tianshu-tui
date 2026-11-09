@@ -39,7 +39,7 @@ import type { Context, Events } from '@deepseek-ai/cordis'
 import { Session, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { assistantStreamHasVisibleText } from '@deepseek-ai/dsh-llm'
 import type { AssistantStreamRecord, ToolCallId, TokenUsage } from '@deepseek-ai/dsh-llm'
-import { installModelSelection, type Agent, type AgentHandle, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
+import { installModelSelection, type Agent, type AgentHandle, type ModelSelection } from '@deepseek-ai/dsh-agent'
 // 空类型导入引入 Context 上 agentDefaultModel 服务的声明合并（headless 同款）。
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 // 空类型导入引入 'user-questions/request' waterfall 事件的声明合并（rc.1 wire）。
@@ -73,7 +73,7 @@ import {
   parseImageDataUrl,
 } from '../engine/term-image.js'
 import { createTranscript, type Transcript, type TranscriptToolCall } from '../adapter/transcript.js'
-import { resolveToolViews, type ToolPresenterSource } from '../adapter/tool-view.js'
+import { resolveToolViews, type ResolvedToolViews, type ToolPresenterSource, type ToolViewRequest } from '../adapter/tool-view.js'
 import { trackAgent, type LiveAgent } from '../adapter/live.js'
 import { controlsFromHandle, controlsFromRegistry, type AgentControls } from '../adapter/send.js'
 import {
@@ -664,8 +664,8 @@ export class TuiApp {
   private taskSurfaceDisposer: (() => void) | null = null
   /** T1.4：plan 投影 active 态（驱动 statusline [plan] 徽标；服务缺失时为 false）。 */
   private planState: { active: boolean; pending: boolean } = { active: false, pending: false }
-  /** C2 项 4：当前会话的模型选择 ref（newSession/switchSession 挂载；registry 兜底为 null）。 */
-  private modelRef: ModelSelectionRef | null = null
+  /** 当前 live Agent 的持久化模型面（新建、恢复、fork 及 registry 复用统一接线）。 */
+  private model: Agent['model'] | null = null
   /** C2 项 2：历史搜索 overlay（Ctrl+F；attach 时注册，消息快照激活时提供）。 */
   private searchOverlay: HistorySearchOverlay | null = null
   private scrollPager: ScrollPagerOverlay | null = null
@@ -2032,8 +2032,8 @@ export class TuiApp {
 
   /**
    * 新建会话：经 ctx.agents.create 铸造 session+agent，本层持有 handle。
-   * 模型定路取 agentDefaultModel 当前选择（settings 用户层实时生效），并经
-   * installModelSelection 耦合 prompt 装配与请求路由（headless 同款接线）。
+   * 初始完整选择取 agentDefaultModel（含显式 reasoningEffort）；后续路由由
+   * handle.agent.model 持久化，installModelSelection 只安装切换提示。
    * 会话 id 由本层铸造（session-<uuid>），create 返回的 handle 由 ownedHandle 持有、
    * detach/dispose 时释放；controls 走 controlsFromHandle（驱动 handle.agent）。
    * 先卸载当前挂载（与 switchSession 对称）：否则 transcript/liveAgent/
@@ -2060,10 +2060,6 @@ export class TuiApp {
     }
     const sessionId = id ?? SessionId(`session-${randomUUID()}`)
     const selection = this.ctx.agentDefaultModel.currentSelection()
-    // C2 项 4：持有可变 ModelSelectionRef——/model 热切当前会话（改 current，
-    // 下一次 agent 步进的 prompt assembly 自动生效）。
-    this.modelRef = { current: selection, assembled: undefined }
-    const ref = this.modelRef
     // header.cwd 是 Web 会话列表与 workspace 挂载的门槛：缺省会被持久化进
     // `_no-cwd/` 并从 web API 可见列表过滤掉（issue #5）。TUI 工作区 = 启动目录。
     // joinedId 在 setup 回调内赋值：agents.create 的契约是 await 完 setup 才 resolve，
@@ -2072,12 +2068,13 @@ export class TuiApp {
     const handle = await this.ctx.agents.create({
       sessionId,
       meta: { cwd: process.cwd() },
-      agentOptions: { provider: selection.provider, model: selection.model },
+      agentOptions: { ...selection },
       setup: async (agentCtx) => {
-        installModelSelection(agentCtx, ref)
+        installModelSelection(agentCtx)
         joinedId = await joinCreateOrWarn(this.ctx, agentCtx, this.prefs.preset, m => this.echoWarn(m))
       },
     })
+    this.model = handle.agent.model
     this.ownedHandle = handle
     this.controls = controlsFromHandle(handle)
     this.activeSessionId = sessionId
@@ -2089,15 +2086,14 @@ export class TuiApp {
   }
 
   /**
-   * C2 项 4：热切当前会话的模型。改 modelRef.current——下一次 agent 步进
-   * （prompt assembly）自动生效，不中断当前步骤。registry 兜底的会话
-   * （ref 由其他装配方持有）返回 false，调用方提示不可热切。
-   * @param selection - 新的 provider/model。
-   * @returns 是否已热切（modelRef 存在）。
+   * 热切当前会话的模型：持久化完整选择，由下一个尚未开始准备的 step 使用。
+   * select 的 Session append 异常直接上抛，调用方经既有错误通道展示。
+   * @param selection - 新的 provider/model/可选显式 reasoningEffort。
+   * @returns 当前是否有 live Agent 可热切。
    */
   switchLiveModel(selection: ModelSelection): boolean {
-    if (this.modelRef === null) return false
-    this.modelRef.current = selection
+    if (this.model === null) return false
+    this.model.select(selection)
     this.glanceModelName = selection.model
     this.glanceEffort = selection.reasoningEffort ?? null
     this.refreshVisionForSelection(selection)
@@ -2112,7 +2108,7 @@ export class TuiApp {
     const forked = await createForkedAgent(this.ctx, parent, this.activeSessionId, process.cwd())
     await this.detachProjections({ keepHandle: true })
     this.dynamicRowsHighWater = 0
-    this.modelRef = forked.ref
+    this.model = forked.handle.agent.model
     this.ownedHandle = forked.handle
     this.controls = controlsFromHandle(forked.handle)
     this.activeSessionId = forked.childId
@@ -2204,7 +2200,7 @@ export class TuiApp {
   private async openModelPicker(): Promise<void> {
     const saved = (this.ctx as unknown as { agentDefaultModel?: ModelFacet }).agentDefaultModel
       ?.currentSelection()
-    const live = this.modelRef?.current ?? saved
+    const live = this.model?.current() ?? saved
     await openModelPicker({
       overlay: this.overlay,
       picker: this.picker,
@@ -2309,7 +2305,7 @@ export class TuiApp {
   private openEffortPicker(): void {
     const facet = (this.ctx as unknown as { agentDefaultModel?: ModelFacet }).agentDefaultModel
     const saved = facet?.currentSelection()
-    const live = this.modelRef?.current ?? saved
+    const live = this.model?.current() ?? saved
     openEffortPicker({
       overlay: this.overlay, picker: this.picker,
       currentEffort: live?.reasoningEffort ?? 'auto',
@@ -2428,27 +2424,24 @@ export class TuiApp {
   }
 
   /**
-   * 切换到既有会话：卸载旧投影/控制面（并释放本层持有的旧 handle），
-   * 再 agent-ensure 目标会话——registry 有 live agent 走 controlsFromRegistry 兜底
-   * （非自有，不 dispose）；无则 resume 拿 handle（本层持有并 dispose）。
-   * resume 的模型定路沿用会话持久化的 request header（跨重启续模），
-   * 无 header（从未成功发起请求的会话）才落 agentDefaultModel 当前选择。
+   * 切换到既有会话：registry 有 live agent 直接复用其模型面；否则 resume 并持有 handle。
+   * agentOptions 只提供无持久化选择时的 fallback；AgentModel 自动恢复 pending/lastUsed，
+   * 普通 resume 不调 select()，避免默认路由覆盖尚未使用的选择。
    * 恢复先于任何切换状态提交：目标不可恢复时在此抛错，应用停留在原会话（不进入半切换态）。
    * @param id - 目标会话 id；live 会话或可恢复的持久化会话。
    */
   async switchSession(id: SessionId): Promise<void> {
     const agent = this.ctx.agents.get(id)
     const persisted = agent === undefined ? getSession(this.ctx, id)?.requestHeader()?.config : undefined
-    const selection = resumeModelSelection(persisted, () => this.ctx.agentDefaultModel.currentSelection())
-    // C2 项 4：持有可变 ref（resume 续模的 selection 也进 ref.current）
-    const ref: ModelSelectionRef = { current: selection, assembled: undefined }
+    const selection = agent?.model?.current() ?? resumeModelSelection(persisted, () => this.ctx.agentDefaultModel.currentSelection())
     const handle = agent !== undefined
       ? undefined
       : await this.ctx.agents.resume({
         resumeSessionId: id,
-        agentOptions: { provider: selection.provider, model: selection.model },
+        agentOptions: { ...selection },
         setup: async (agentCtx) => {
-          installModelSelection(agentCtx, ref)
+          installModelSelection(agentCtx)
+          // rc.1：session/created 先于 setup，恢复日志在此已可读；Agent 尚未发布。
           const live = getSession(this.ctx, id)
           await joinResume(this.ctx, agentCtx, resolvePresetId(live?.header.agentPreset, live?.snapshotEvents()))
         },
@@ -2461,10 +2454,9 @@ export class TuiApp {
     if (agent !== undefined) {
       /* v8 ignore next -- agent 已确认存在（if 分支外），controlsFromRegistry 恒返回非空 */
       this.controls = controlsFromRegistry(this.ctx, id) ?? null
-      // registry 兜底：ref 由其他装配方持有，本层不可热切
-      this.modelRef = null
+      this.model = agent.model
     } else if (handle !== undefined) {
-      this.modelRef = ref
+      this.model = handle.agent.model
       this.ownedHandle = handle
       this.controls = controlsFromHandle(handle)
     }
@@ -2500,25 +2492,15 @@ export class TuiApp {
     // Phase 6.2：工作流阶段指示器接入生产消费端——订阅 agent/status + session/event，
     // 折叠结果经 onUpdate 触发重绘，renderLive 优先取 statusLine.current 作状态行。
     this.statusLine = new WorkflowStatusLine(this.ctx, id, () => { this.renderBatcher.schedule() })
-    // Phase 5.3：glance metrics 行的 model 名随会话挂载快照（渲染不重复查询）。
-    // 定路与 switchSession 同构：持久化 request header 优先，无 header 才落
-    // agentDefaultModel 当前选择——渲染不引入额外的 currentSelection 读取。
-    // 推理努力度同构：实际请求 header 优先（adapterDefaults 折叠后的生效值），
-    // 无 header 才落当前默认选择；request/header 事件随后保持新鲜。
-    // header 完整存在时零查询（持久化路由存在不读默认选择——路由测试断言）。
-    const headerConfig = session.requestHeader()?.config
-    if (headerConfig !== undefined) {
-      this.glanceModelName = headerConfig.model
-      this.glanceEffort = headerConfig.reasoningEffort ?? null
-    } else {
-      const selection = this.ctx.agentDefaultModel.currentSelection()
-      this.glanceModelName = selection.model
-      this.glanceEffort = selection.reasoningEffort ?? null
-    }
-    const visionSelection = headerConfig !== undefined
-      ? { provider: headerConfig.provider, model: headerConfig.model }
-      : this.ctx.agentDefaultModel.currentSelection()
-    this.refreshVisionForSelection(visionSelection)
+    // Phase 5.3：挂载时读取 AgentModel 的 pending → lastUsed → options 当前选择，
+    // 避免旧 request header 覆盖尚未使用的模型/effort；request/header 事件随后保持新鲜。
+    const selection = this.model?.current() ?? resumeModelSelection(
+      session.requestHeader()?.config,
+      () => this.ctx.agentDefaultModel.currentSelection(),
+    )
+    this.glanceModelName = selection.model
+    this.glanceEffort = selection.reasoningEffort ?? null
+    this.refreshVisionForSelection(selection)
     // 上下文窗口：路由元数据折叠（request/context 只在路由变化时记录；热切换经
     // request/context 事件更新，见 handleStreamEvent）。
     this.contextWindow = session.requestContext()?.contextWindow ?? null
@@ -3391,7 +3373,7 @@ export class TuiApp {
     if (transcript === null) return []
     return renderTranscript(transcript.view, this.theme, this.stdout.columns, {
       compact: this.compactMode,
-      resolveViews: (tool: TranscriptToolCall) => resolveToolViews(this.toolPresenters(), {
+      resolveViews: (tool: TranscriptToolCall) => this.resolveToolViews({
         name: tool.name,
         argumentsRaw: tool.arguments,
         ...(tool.result === undefined ? {} : {
@@ -3496,7 +3478,7 @@ export class TuiApp {
         // 推理后直接发工具（无正文 step）的段边界。
         this.commitReasoningBlock()
         // live 进行中卡标题接 presentCall（意图缺省回落 toolArgSummary 启发式）。
-        const { call } = resolveToolViews(this.toolPresenters(), {
+        const { call } = this.resolveToolViews({
           name: event.data.name,
           argumentsRaw: event.data.arguments,
         })
@@ -3574,6 +3556,15 @@ export class TuiApp {
     return this.ctx.reflect.get('tools', false) as ToolPresenterSource | undefined
   }
 
+  /** live/replay 共用当前 Agent scope；registry 中无对应 Agent 时保持文本降级。 */
+  private resolveToolViews(request: Omit<ToolViewRequest, 'scope'>): ResolvedToolViews {
+    const id = this.activeSessionId
+    if (id === null) return {}
+    const agent = this.ctx.agents.get(id)
+    if (agent === undefined) return {}
+    return resolveToolViews(this.toolPresenters(), { ...request, scope: agent })
+  }
+
   /**
    * 结算工具卡实时提交：从 transcript 查配对 call 的 name/arguments →
    * presenter 桥 → 卡片渲染 → 串行在流式文本 flush 之后 commit 进
@@ -3585,7 +3576,7 @@ export class TuiApp {
     const tool = this.transcript?.view.tools.findLast(t => t.callId === callId)
     if (tool === undefined) return
     const { content, isError } = toolResultText(event)
-    const views = resolveToolViews(this.toolPresenters(), {
+    const views = this.resolveToolViews({
       name: tool.name,
       argumentsRaw: tool.arguments,
       result: {
@@ -4185,8 +4176,7 @@ export class TuiApp {
   /**
    * 卸载当前会话的投影与控制面，并按 opts 处理本层持有的 handle：
    * - keepHandle（P3 side conversation 切换）：所有权让渡 registry——agent
-   *   保持 live（可切回复用），退出时由 agent-loop factory 统一 teardown；
-   *   modelRef 同步让渡（registry 兜底语义：不可热切）。
+   *   保持 live（可切回复用并继续热切），退出时由 agent-loop factory 统一 teardown。
    * - 缺省（dispose 退出）：释放本层 handle（create/resume 铸造的）。
    * registry 兜底的裸 agent 非自有，两种情况都不 dispose。会话本身所有权归
    * 持有方，不销毁。
@@ -4240,13 +4230,13 @@ export class TuiApp {
       if (opts?.keepHandle === true) {
         // P3：切换保留——让渡 registry（agent 保持 live；退出时 factory 统一清理）。
         this.ownedHandle = null
-        this.modelRef = null
       } else {
         const handle = this.ownedHandle
         this.ownedHandle = null
         await handle.dispose()
       }
     }
+    this.model = null
     this.transcript = null
     this.liveAgent = null
     this.statusLine = null

@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WriteStream } from 'node:tty'
 import { Session, SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
-import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import type { Agent, AgentHandle, ModelSelection } from '@deepseek-ai/dsh-agent'
 import { TuiApp, parseSlashCommand } from '../src/ui/app.js'
 import { LiveEngine } from '../src/engine/live-engine.js'
 import type { SlashHintEntry } from '../src/engine/input-controller.js'
@@ -167,6 +168,7 @@ function makeCtx(): Context & MockCtx {
 /** makeAgent 的 mock 字段类型：驱动方法可断言（mock/mockReturnValue）。 */
 interface MockAgent {
   session: { requestHeader: ReturnType<typeof vi.fn>; mockLog: unknown[] }
+  model: { current: ReturnType<typeof vi.fn>; select: ReturnType<typeof vi.fn> }
   followup: ReturnType<typeof vi.fn>
   steer: ReturnType<typeof vi.fn>
   inject: ReturnType<typeof vi.fn>
@@ -174,12 +176,14 @@ interface MockAgent {
   whenIdle: ReturnType<typeof vi.fn>
 }
 
-/** 最小 live agent 替身：驱动方法可断言。 */
+/** 最小 live agent 替身：模型面模拟 pending → request header → 默认 options。 */
 function makeAgent(id: string): Agent & MockAgent {
   const mockLog: unknown[] = []
-  return {
+  let selected: ModelSelection | undefined
+  const agent = {
     id: SessionId(id),
-    options: {},
+    options: { provider: 'mock', model: 'mock' },
+    model: { current: vi.fn(), select: vi.fn() },
     session: {
       id: SessionId(id),
       header: { id: SessionId(id), version: 0, createdAt: 1, isSeeded: false },
@@ -215,6 +219,18 @@ function makeAgent(id: string): Agent & MockAgent {
     cancel: vi.fn(),
     whenIdle: vi.fn(async () => { }),
   } as unknown as Agent & MockAgent
+  agent.model.current.mockImplementation(() => {
+    if (selected !== undefined) return selected
+    const config = agent.session.requestHeader()?.config
+    if (config === undefined) return { provider: 'mock', model: 'mock' }
+    return {
+      provider: config.provider,
+      model: config.model,
+      ...config.reasoningEffort === undefined ? {} : { reasoningEffort: config.reasoningEffort },
+    }
+  })
+  agent.model.select.mockImplementation((selection: ModelSelection) => { selected = selection })
+  return agent
 }
 
 /** 最小 handle 替身：dispose 可断言。可传入局部 mock 句柄以便断言引用局部变量。 */
@@ -481,7 +497,7 @@ describe('TuiApp agent-ensure 三分支', () => {
     const state = app as unknown as {
       activeSessionId: SessionId
       transcript: { view: { messages: unknown[] } } | null
-      modelRef: unknown
+      model: unknown
     }
     expect(state.activeSessionId).toBe(SessionId('old-1'))
     expect(state.transcript).not.toBeNull()
@@ -584,6 +600,9 @@ describe('TuiApp agent-ensure 三分支', () => {
     expect(ctx.agents.resume).not.toHaveBeenCalled()
     app.handleSubmit('hi')
     expect(agentA.followup).toHaveBeenCalledTimes(1)
+    const selection = { provider: 'openai', model: 'gpt-5', reasoningEffort: ReasoningEffortId('max') }
+    expect(app.switchLiveModel(selection)).toBe(true)
+    expect(agentA.model.select).toHaveBeenCalledWith(selection)
 
     // 所有权已让渡 registry：退出时本层不再 dispose（释放由 agent-loop factory
     // 在 ctx teardown 统一承担——mock 无 factory，此处断言"不再持有"语义）。
@@ -762,8 +781,9 @@ describe('TuiApp 启动复用（上一个空会话 id 复用 + cwd 重绑启动�
 })
 
 describe('TuiApp 模型定路', () => {
-  it('newSession 的 setup 经 installModelSelection 接线装配与请求路由', async () => {
+  it('newSession 保留默认 reasoningEffort，setup 只安装 rc.1 切换提示', async () => {
     const ctx = makeCtx()
+    ctx.agentDefaultModel.currentSelection.mockReturnValue({ provider: 'mock', model: 'mock', reasoningEffort: 'high' })
     const agent = makeAgent('route-1')
     ctx.agents.create.mockResolvedValue(makeHandle(agent))
     ctx.sessions.get.mockReturnValue(agent.session)
@@ -771,11 +791,14 @@ describe('TuiApp 模型定路', () => {
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
     await app.newSession()
 
-    const setup = (ctx.agents.create.mock.calls[0]?.[0] as { setup?: (c: unknown) => void } | undefined)?.setup
-    expect(setup).toBeTypeOf('function')
+    const options = (ctx.agents.create.mock.calls[0]?.[0] as { setup?: (c: unknown) => void } | undefined)
+    expect(ctx.agents.create).toHaveBeenCalledWith(expect.objectContaining({
+      agentOptions: { provider: 'mock', model: 'mock', reasoningEffort: 'high' },
+    }))
+    expect(options?.setup).toBeTypeOf('function')
     const agentCtx = { on: vi.fn((_name: string, _handler: unknown) => () => { }) }
-    setup?.(agentCtx)
-    expect(agentCtx.on.mock.calls.map(call => call[0])).toEqual(['system-prompt/assemble', 'agent/request', 'agent/pre-step'])
+    options?.setup?.(agentCtx)
+    expect(agentCtx.on.mock.calls.map(call => call[0])).toEqual(['agent/pre-step'])
     await app.dispose()
   })
 
@@ -795,6 +818,35 @@ describe('TuiApp 模型定路', () => {
     }))
     // 持久化路由存在时不读默认选择
     expect(ctx.agentDefaultModel.currentSelection).not.toHaveBeenCalled()
+    await app.dispose()
+  })
+
+  it('普通 resume 不 select 覆盖 pending，挂载展示 pending route+effort', async () => {
+    const ctx = makeCtx()
+    const agent = makeAgent('route-pending')
+    const pending = { provider: 'deepseek', model: 'pending-model', reasoningEffort: ReasoningEffortId('low') }
+    agent.session.requestHeader.mockReturnValue({
+      config: { provider: 'deepseek', model: 'used-model', reasoningEffort: 'high' },
+    })
+    agent.model.current.mockReturnValue(pending)
+    ctx.agents.get.mockReturnValue(undefined)
+    ctx.agents.resume.mockImplementation(async (options: { setup?: (c: unknown) => void | Promise<void> }) => {
+      const agentCtx = { on: vi.fn((_name: string, _handler: unknown) => () => { }) }
+      await options.setup?.(agentCtx)
+      expect(agentCtx.on.mock.calls.map(call => call[0])).toEqual(['agent/pre-step'])
+      return makeHandle(agent)
+    })
+    ctx.sessions.get.mockReturnValue(agent.session)
+
+    const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
+    await app.switchSession(SessionId('route-pending'))
+
+    expect(ctx.agents.resume).toHaveBeenCalledWith(expect.objectContaining({
+      agentOptions: { provider: 'deepseek', model: 'used-model', reasoningEffort: 'high' },
+    }))
+    expect(agent.model.select).not.toHaveBeenCalled()
+    expect((app as unknown as { glanceModelName: string | null }).glanceModelName).toBe('pending-model')
+    expect((app as unknown as { glanceEffort: string | null }).glanceEffort).toBe('low')
     await app.dispose()
   })
 })
@@ -4210,16 +4262,24 @@ describe('TuiApp forkSession（A3 会话分叉）', () => {
   })
 })
 
-describe('TuiApp switchLiveModel（C2 项 4 模型热切）', () => {
-  it('newSession 后热切生效（返回 true）', async () => {
+describe('TuiApp switchLiveModel（rc.1 持久化模型热切）', () => {
+  it('newSession 后 select 完整 route+effort，Auto 不继承旧 effort', async () => {
     const ctx = makeCtx()
     const agent = makeAgent('hot-1')
-    const handle = makeHandle(agent)
-    ctx.agents.create.mockResolvedValue(handle)
+    ctx.agents.create.mockResolvedValue(makeHandle(agent))
     ctx.sessions.get.mockReturnValue(agent.session)
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
     await app.newSession()
-    expect(app.switchLiveModel({ provider: 'openai', model: 'gpt-5' })).toBe(true)
+
+    const explicit = { provider: 'openai', model: 'gpt-5', reasoningEffort: ReasoningEffortId('max') }
+    expect(app.switchLiveModel(explicit)).toBe(true)
+    expect(agent.model.select).toHaveBeenCalledWith(explicit)
+    expect((app as unknown as { glanceEffort: string | null }).glanceEffort).toBe('max')
+
+    const automatic = { provider: 'openai', model: 'gpt-5' }
+    expect(app.switchLiveModel(automatic)).toBe(true)
+    expect(agent.model.select).toHaveBeenCalledWith(automatic)
+    expect((app as unknown as { glanceEffort: string | null }).glanceEffort).toBeNull()
     await app.dispose()
   })
 
@@ -4230,27 +4290,47 @@ describe('TuiApp switchLiveModel（C2 项 4 模型热切）', () => {
     await app.dispose()
   })
 
-  it('switchSession 到 registry 兜底会话（agent 已存在）→ 热切不可用（ref 归 null）', async () => {
+  it('switchSession 到 registry 已有 agent → 复用模型面并可热切', async () => {
     const ctx = makeCtx()
     const agent = makeAgent('hot-registry-1')
-    ctx.agents.get.mockReturnValue(agent) // registry 已有 live agent
-    ctx.sessions.get.mockReturnValue(agent.session) // mountSession 需要 session
+    ctx.agents.get.mockReturnValue(agent)
+    ctx.sessions.get.mockReturnValue(agent.session)
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
     await app.switchSession(SessionId('hot-registry-1'))
-    expect(app.switchLiveModel({ provider: 'openai', model: 'gpt-5' })).toBe(false)
+    const selection = { provider: 'openai', model: 'gpt-5' }
+    expect(app.switchLiveModel(selection)).toBe(true)
+    expect(agent.model.select).toHaveBeenCalledWith(selection)
     await app.dispose()
   })
 
   it('switchSession 到 resume 会话（无 live agent）→ 热切生效', async () => {
     const ctx = makeCtx()
     const agent = makeAgent('hot-resume-1')
-    const handle = makeHandle(agent)
     ctx.agents.get.mockReturnValue(undefined)
-    ctx.agents.resume.mockResolvedValue(handle)
+    ctx.agents.resume.mockResolvedValue(makeHandle(agent))
     ctx.sessions.get.mockReturnValue(agent.session)
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
     await app.switchSession(SessionId('hot-resume-1'))
-    expect(app.switchLiveModel({ provider: 'openai', model: 'gpt-5' })).toBe(true)
+    const selection = { provider: 'openai', model: 'gpt-5' }
+    expect(app.switchLiveModel(selection)).toBe(true)
+    expect(agent.model.select).toHaveBeenCalledWith(selection)
+    await app.dispose()
+  })
+
+  it('select 异常经 slash 错误通道可见，且不提前更新显示状态', async () => {
+    const ctx = makeCtx()
+    const agent = makeAgent('hot-error')
+    agent.model.select.mockImplementation(() => { throw new Error('append denied') })
+    ctx.agents.create.mockResolvedValue(makeHandle(agent))
+    ctx.sessions.get.mockReturnValue(agent.session)
+    const stdout = makeStdout()
+    const app = new TuiApp({ ctx, stdout, stdin: makeStdin() })
+    await app.attach()
+
+    app.handleSubmit('/model openai/gpt-5')
+    await new Promise(resolve => setTimeout(resolve, 40))
+    expect(stdout.write.mock.calls.map(call => `${call[0]}`).join('')).toContain('⚠ 命令执行失败: append denied')
+    expect((app as unknown as { glanceModelName: string | null }).glanceModelName).toBe('mock')
     await app.dispose()
   })
 })
@@ -5020,7 +5100,9 @@ describe('TuiApp resume 模型定路分支', () => {
     const app = new TuiApp({ ctx, stdout: makeStdout(), stdin: makeStdin() })
     await app.switchSession(SessionId('eff-1'))
     expect(ctx.agents.resume).toHaveBeenCalledTimes(1)
-    // agentOptions 只传 provider/model；reasoningEffort 经 selection 进 setup（installModelSelection）
+    expect(ctx.agents.resume).toHaveBeenCalledWith(expect.objectContaining({
+      agentOptions: { provider: 'deepseek', model: 'deepseek-r1', reasoningEffort: 'high' },
+    }))
     const options = ctx.agents.resume.mock.calls[0]?.[0] as { setup?: (c: unknown) => void }
     expect(options.setup).toBeTypeOf('function')
     await app.dispose()
@@ -5031,7 +5113,7 @@ describe('TuiApp resume 模型定路分支', () => {
     const agent = makeAgent('setup-1')
     ctx.agents.get.mockReturnValue(undefined)
     ctx.agents.resume.mockImplementation((options: { setup?: (c: unknown) => void }) => {
-      const agentCtx = { on: vi.fn(() => () => { }) }
+      const agentCtx = { on: vi.fn((_name: string, _handler: unknown) => () => { }) }
       options.setup?.(agentCtx)
       return makeHandle(agent)
     })
@@ -5074,10 +5156,12 @@ async function bootEventApp() {
   ;(agent.session as { id: SessionId }).id = app.sessionId ?? SessionId('evt-1')
   ;(agent as { id: SessionId }).id = agent.session.id
   ctx.sessions.get.mockReturnValue(agent.session)
+  ctx.agents.get.mockReturnValue(agent)
   const owner = { id: app.sessionId ?? SessionId('evt-1') }
   return {
     app,
     ctx,
+    agent,
     stdout,
     stdin,
     owner,
@@ -5247,20 +5331,16 @@ describe('TuiApp 结算卡与推理通道', () => {
     await app.dispose()
   })
 
-  it('presenter 意图接线：tools 服务 presentResult → 结构化 diff 卡', async () => {
-    const { app, ctx, stdout, owner, fire } = await bootEventApp()
-    ctx.reflect.get.mockImplementation((name: string) => {
-      if (name !== 'tools') return undefined
-      return {
-        get: (toolName: string) => (toolName === 'edit_file' ? {
-          presentResult: () => ({
-            card: 'diff',
-            title: 'Update(a.ts)',
-            diffs: [{ path: 'a.ts', oldText: 'x = 1', newText: 'x = 2' }],
-          }),
-        } : undefined),
-      }
-    })
+  it('presenter live/replay 均传当前 Agent scope → 结构化 diff 卡', async () => {
+    const { app, ctx, agent, stdout, owner, fire } = await bootEventApp()
+    const get = vi.fn((toolName: string, _scope: Agent) => (toolName === 'edit_file' ? {
+      presentResult: () => ({
+        card: 'diff',
+        title: 'Update(a.ts)',
+        diffs: [{ path: 'a.ts', oldText: 'x = 1', newText: 'x = 2' }],
+      }),
+    } : undefined))
+    ctx.reflect.get.mockImplementation((name: string) => name === 'tools' ? { get } : undefined)
     fire('session/event', owner, {
       type: 'tool/call',
       seq: 0,
@@ -5286,6 +5366,47 @@ describe('TuiApp 结算卡与推理通道', () => {
     expect(written).toContain('Update(a.ts)')
     expect(written).toContain('+ x = 2')
     expect(written).toContain('- x = 1')
+    expect(get).toHaveBeenCalledWith('edit_file', agent)
+
+    const liveCalls = get.mock.calls.length
+    ;(app as unknown as { rerenderHistory(): void }).rerenderHistory()
+    expect(get.mock.calls.length).toBeGreaterThan(liveCalls)
+    for (const call of get.mock.calls) expect(call).toEqual(['edit_file', agent])
+    await app.dispose()
+  })
+
+  it('presenter 当前 Agent 缺失时不查询 tools，保留文本卡降级', async () => {
+    const { app, ctx, stdout, owner, fire } = await bootEventApp()
+    const get = vi.fn(() => ({
+      presentResult: () => ({ card: 'diff', title: 'Update(a.ts)', diffs: [] }),
+    }))
+    ctx.reflect.get.mockImplementation((name: string) => name === 'tools' ? { get } : undefined)
+    ctx.agents.get.mockReturnValue(undefined)
+    fire('session/event', owner, {
+      type: 'tool/call',
+      seq: 0,
+      time: 1,
+      data: { callId: 'diff-no-agent', name: 'edit_file', arguments: '{"file_path":"a.ts"}', turn: 1, step: 0 },
+    })
+    fire('session/event', owner, {
+      type: 'tool/result',
+      seq: 1,
+      time: 2,
+      data: {
+        turn: 1,
+        step: 0,
+        message: {
+          content: [{ type: 'text', text: '模型面 diff 文本' }],
+          source: { kind: 'tool', callId: 'diff-no-agent' },
+          toolCallId: 'diff-no-agent',
+        },
+      },
+    })
+    await new Promise(resolve => setTimeout(resolve, 300))
+    const written = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
+    expect(get).not.toHaveBeenCalled()
+    expect(written).toContain('模型面 diff 文本')
+    expect(written).not.toContain('Update(a.ts)')
     await app.dispose()
   })
 
@@ -6320,9 +6441,9 @@ describe('TuiApp /model slash 走 switchLiveModel 闭包', () => {
 
     app.handleSubmit('/model deepseek/v4-turbo')
     await new Promise(resolve => setTimeout(resolve, 30))
-    // 热切路径：modelRef.current 更新（switchLiveModel 闭包生效）
+    // 热切路径：当前 Agent.model.select 收到完整新选择
     await app.dispose()
-    expect((app as unknown as { modelRef: { current: unknown } | null }).modelRef?.current).toEqual({ provider: 'deepseek', model: 'v4-turbo' })
+    expect(agent.model.select).toHaveBeenCalledWith({ provider: 'deepseek', model: 'v4-turbo' })
   })
 })
 
@@ -6530,6 +6651,8 @@ describe('Issue #31 交互式选择器（/model /theme /session 无参打开）'
     })
     ctx.agents.create.mockImplementation(({ sessionId }: { sessionId: string }) => {
       const agent = makeAgent(sessionId)
+      const selection = ctx.agentDefaultModel.currentSelection()
+      agent.model.current.mockReturnValue(selection)
       ctx.sessions.get.mockReturnValue(agent.session)
       return makeHandle(agent)
     })

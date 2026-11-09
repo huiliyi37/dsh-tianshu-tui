@@ -3,7 +3,7 @@
  *
  * 花名册 list() 已有声明行的 name/description；本表补「工具集 + 能力」
  * 给 /preset 列表与 footer/顶栏短名。id 对齐本包 cordis.patch.yml 的
- * preset-{standard,ptc,minimal,cordis} 声明行（与官方 web-app 0.2.1 预设同源）。
+ * preset-{standard,ptc,minimal,cordis} 声明行（与官方 web-app 0.2.2-rc.1 预设同源）。
  *
  * @module @huiliyi37/dsh-tianshu-tui/preset-catalog
  */

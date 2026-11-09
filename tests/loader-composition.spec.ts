@@ -4,6 +4,7 @@
 // 只在终端边界造假（fake TTY 流）、llm-replay 顶掉真适配器。断言用行为判据：
 // 挂载后事件驱动渲染、tui-runner fiber dispose 后监听器全释放（写静默）、
 // raw-mode 对称恢复。C4 认领的 disposer 缺陷以 it.todo 立线（见文末）。
+// 0.2.2-rc.1：Host 补 dsh-tool-executor-native，Loader builtins 补 group。
 //
 // 0.2.0 适配注记：
 // - dsh-settings-file 不存在了。dsh-settings 需要 profileContext（只在真实
@@ -26,6 +27,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
+import Group from '@deepseek-ai/cordis-plugin-group'
 import type { ReadStream, WriteStream } from 'node:tty'
 import CredentialsLocal from '@deepseek-ai/dsh-credentials-local'
 import UserApproval from '@deepseek-ai/dsh-user-approval'
@@ -37,6 +39,7 @@ import SessionProjection from '@deepseek-ai/dsh-session-projection'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import Tools from '@deepseek-ai/dsh-tools'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import AgentDefaultModel from '@deepseek-ai/dsh-agent-default-model'
 import Goal from '@deepseek-ai/dsh-goal'
 import Subagent, { SubagentRunId } from '@deepseek-ai/dsh-subagent'
@@ -174,6 +177,8 @@ async function boot(opts?: { withGoalSubagent?: boolean }): Promise<Booted> {
     "  name: '@deepseek-ai/dsh-system-prompt'",
     '- id: tools',
     "  name: '@deepseek-ai/dsh-tools'",
+    '- id: tool-executor-native',
+    "  name: '@deepseek-ai/dsh-tool-executor-native'",
     '- id: agent-default-model',
     "  name: '@deepseek-ai/dsh-agent-default-model'",
     '  config:',
@@ -214,6 +219,7 @@ async function boot(opts?: { withGoalSubagent?: boolean }): Promise<Booted> {
     ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-system-prompt', SystemPrompt],
     ['@deepseek-ai/dsh-tools', Tools],
+    ['@deepseek-ai/dsh-tool-executor-native', NativeToolExecutor],
     ['@deepseek-ai/dsh-agent-default-model', AgentDefaultModel],
     ['@deepseek-ai/dsh-goal', Goal],
     ['@deepseek-ai/dsh-subagent', Subagent],
@@ -225,6 +231,7 @@ async function boot(opts?: { withGoalSubagent?: boolean }): Promise<Booted> {
   context = ctx
   ctx.baseUrl = pathToFileURL(root).href + '/'
   await ctx.plugin(Loader)
+  ctx.loader.builtins.group = Group
   ctx.loader.builtins.include = Include
   ctx.loader.internal = {
     version: 'v2',

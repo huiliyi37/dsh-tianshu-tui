@@ -2,12 +2,13 @@
  * adapter/tool-view — presenter 桥软降级契约测试。
  *
  * 桥的全部失败路径都必须归于「无意图」空对象：tools 服务缺失、工具未注册、
- * 参数 JSON 不可解析、presenter 抛错、presenter 返回 undefined。成功路径
- * 把 presentCall / presentResult 的产物原样透出，meta 从事件透传给
- * presentResult。展示层失败绝不冒泡（会话流不受渲染意图影响）。
+ * scoped 调用缺 Agent scope、参数 JSON 不可解析、presenter 抛错或返回 undefined。
+ * 成功路径转发 scope，把 presentCall / presentResult 的产物原样透出，meta 从事件
+ * 透传给 presentResult。展示层失败绝不冒泡（会话流不受渲染意图影响）。
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ToolPresenterSource } from '../src/adapter/tool-view.js'
 import { resolveToolViews } from '../src/adapter/tool-view.js'
 
@@ -42,6 +43,18 @@ describe('resolveToolViews', () => {
       { command: 'ls' },
       { content: RESULT.content, isError: false, meta: { exitCode: 0 } },
     )
+  })
+
+  it('Agent scope 转发给 tools.get；缺 scope 的 scoped 工具降级', () => {
+    const scope = {} as Agent
+    const get = vi.fn((name: string, agent?: Agent) => (name === 'bash' && agent === scope ? {
+      presentCall: () => ({ card: 'generic' as const, title: 'Scoped run' }),
+    } : undefined))
+    const tools: ToolPresenterSource = { get }
+    expect(resolveToolViews(tools, REQUEST)).toEqual({})
+    expect(resolveToolViews(tools, { ...REQUEST, scope }).call).toEqual({ card: 'generic', title: 'Scoped run' })
+    expect(get).toHaveBeenNthCalledWith(1, 'bash', undefined)
+    expect(get).toHaveBeenNthCalledWith(2, 'bash', scope)
   })
 
   it('无 result 请求只解析 presentCall', () => {

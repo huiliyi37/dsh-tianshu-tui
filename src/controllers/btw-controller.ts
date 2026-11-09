@@ -30,6 +30,7 @@ import { joinAssistantStreamText } from '@deepseek-ai/dsh-llm'
 import type { AgentHandle } from '@deepseek-ai/dsh-agent'
 import { controlsFromHandle } from '../adapter/send.js'
 import { joinPreset, presetJoinFacet } from '../adapter/preset-join.js'
+import { resumeModelSelection } from './session-manager.js'
 
 /** btw 挂起态快照（renderLive 消费；无挂起时 peek() 返回 null）。 */
 export interface BtwPeek {
@@ -128,10 +129,13 @@ export class BtwController {
     if (session === undefined) throw new Error(`unknown session: ${activeId}`)
     const btwId = SessionId(`session-btw-${randomUUID()}`)
     const seed = completedTurnSeed(session.snapshotEvents())
-    const selection = this.ctx.agentDefaultModel.currentSelection()
+    const parentAgent = this.ctx.agents.get(activeId)
+    const selection = parentAgent?.model?.current() ?? resumeModelSelection(
+      session.requestHeader()?.config,
+      () => this.ctx.agentDefaultModel.currentSelection(),
+    )
     // 与 SessionStore.fork 同构：继承父会话 cwd（无则回退启动目录），并记下血缘。
     // 缺 cwd 的 btw 会话同样会掉进 `_no-cwd/`，Web 列表不可见（issue #5）。
-    const parentAgent = this.ctx.agents.get(activeId)
     const handle = await this.ctx.agents.create({
       sessionId: btwId,
       seed,
@@ -141,8 +145,11 @@ export class BtwController {
         isSeeded: seed.length > 0,
       },
       inheritedEventCount: SessionLogOffset(seed.length),
-      agentOptions: { provider: selection.provider, model: selection.model },
-      setup: async (agentCtx) => {
+      agentOptions: { ...selection },
+      setup: async (agentCtx, agent) => {
+        // completedTurnSeed 截去最后 turn/end 后的 pending 选择；显式记录父当前选择，
+        // 否则 seed 中的旧 request header 会覆盖 agentOptions。
+        agent.model.select(selection)
         await joinPreset({
           facet: presetJoinFacet(this.ctx),
           agentCtx,
