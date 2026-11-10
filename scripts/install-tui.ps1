@@ -17,13 +17,13 @@ $Registry = if ($env:NPM_CONFIG_REGISTRY) { $env:NPM_CONFIG_REGISTRY } else { "h
 function Say([string]$Text) { Write-Host "== $Text ==" -ForegroundColor Cyan }
 function Die([string]$Text) { Write-Host "x $Text" -ForegroundColor Red; exit 1 }
 
-# 1. node（^22.19 || >=24）
+# 1. node（>=24.9.0）
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-  Die "缺少 Node.js（^22.19 || >=24）。请先安装：https://nodejs.org/"
+  Die "缺少 Node.js（>=24.9.0）。请先安装：https://nodejs.org/"
 }
-$NodeMajor = [int]((node -p "process.versions.node.split('.')[0]"))
-if ($NodeMajor -lt 22) {
-  Die "Node.js 版本过低（$(node -v)，需要 ^22.19 || >=24）。请升级后重跑。"
+$NodeVersion = [version](node -p "process.versions.node")
+if ($NodeVersion -lt [version]"24.9.0") {
+  Die "Node.js 版本过低（$(node -v)，需要 >=24.9.0）。请升级后重跑。"
 }
 
 # 2. pnpm（没有则 corepack 启用；corepack 的 shim 需新 shell，用 npx 兜底）
@@ -39,7 +39,7 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
 }
 
 function Invoke-Dsh([string[]]$Args) {
-  # 当前适配 0.2.1-rc.4：显式跟随 @next，避免落到旧全局 CLI。
+  # 当前适配 0.2.2-rc.1：显式跟随 @next，避免落到旧全局 CLI。
   if (Get-Command pnpm -ErrorAction SilentlyContinue) {
     & pnpm dlx @deepseek-ai/dsh@next @Args
   } else {
@@ -65,7 +65,7 @@ Invoke-Dsh @("--version") | Out-Null
 Say "装配 tui 插件（@huiliyi37/dsh-tianshu-tui）"
 Invoke-DshNoDie @("plugin", "--profile", "tui", "add", "@huiliyi37/dsh-tianshu-tui")
 if ($LASTEXITCODE -ne 0) {
-  # pnpm ≥ 11.7 对未裁决的原生构建 exit 1（0.2.1 宿主树含 node-pty 等）：
+  # pnpm ≥ 11.7 对未裁决的原生构建 exit 1（0.2.2 宿主树含 node-pty 等）：
   # 把 profile 生成的 pnpm-workspace.yaml 里 allowBuilds 占位填掉再重试一次。
   # dsh-subprocess-local 保留 true（只 chmod node-pty 预编译 helper），其余 false。
   $Ws = if ($env:DSH_HOME) { Join-Path $env:DSH_HOME "profiles/tui/pnpm-workspace.yaml" } else { Join-Path $HOME ".dsh/profiles/tui/pnpm-workspace.yaml" }

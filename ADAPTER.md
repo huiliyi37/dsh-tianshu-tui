@@ -100,6 +100,6 @@ agent 面行（由 shipped 预设再挂）。插件名 `tui-runner` 固定。
 
 ## 契约版本线
 
-- peerDependencies:宿主相关 `@deepseek-ai/*` `^0.2.1-rc.4`（`dsh-invariants` 为 `^0.2.0-rc.2`）、`@deepseek-ai/cordis` `^4.0.5`
-- README 里的官方 CLI `0.2.1-rc.4`（npm `next` 标签）是宿主版本,不是本包版本
+- peerDependencies:宿主相关 `@deepseek-ai/dsh-*` 精确为 `0.2.2-rc.1`，`@deepseek-ai/cordis` 为 `~4.1.0`
+- README 里的官方 CLI `0.2.2-rc.1`（npm `latest` / `next` 均指向此版本）是宿主版本,不是本包版本
 - 宿主版本漂移时:先升级 peer 范围再发版,不静默容忍

@@ -36,12 +36,12 @@
 
 | 组件 | 当前验证版本 |
 |---|---|
-| Node.js | `^22.19 || >=24` |
+| Node.js | `>=24.9.0` |
 | 包管理器 | [`pnpm`](https://pnpm.io/installation)，可由 `corepack enable` 启用 |
-| DeepSeek Harness | `@deepseek-ai/dsh@0.2.1-rc.4`，即 npm `next` 通道 |
-| 本插件 | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.4` |
+| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.1`，npm `latest` / `next` 均指向此版本 |
+| 本插件 | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.5` |
 
-> **请显式使用宿主 `@next`。** 不要用宿主 `@latest` 代替（当前为 `0.2.1-rc.2`，低于要求）；`@alpha` 的 `0.2.2-alpha.2` 存在已知 API 不兼容，暂不支持。本包也不是可独立运行的 CLI。
+> 宿主 npm `latest` 与 `next` 当前均为 `0.2.2-rc.1`。安装命令继续显式使用 `@next`，避免落到旧全局 CLI；本包也不是可独立运行的 CLI。
 
 ### 一键安装（推荐）
 
@@ -125,7 +125,9 @@ pnpm dlx @deepseek-ai/dsh@next --profile tui
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-当前版本：**[`1.0.0-rc.4`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.4)**，适配宿主 `0.2.1-rc.4`。本版修复 [#61](https://github.com/huiliyi37/dsh-tianshu-tui/issues/61)：WSL/原生粘贴 API Key、供应商目录与账号入口，并新增自定义 pi-ai 端点、模型发现和已有路由编辑。版本历史见 [CHANGELOG.md](CHANGELOG.md)，TUI 内可输入 `/changelog` 查看。
+当前版本：**[`1.0.0-rc.5`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.5)**，适配宿主 `0.2.2-rc.1`。本版精确对齐官方 dsh peer、Cordis `~4.1.0` 与 Node `>=24.9.0`；修复四预设、旧 `list-agents` 清理与 PTC executor 接线，迁移到 AgentModel 持久化并修复 `/effort`、`/btw`；工具卡使用当前 Agent scope 的 presenter，同时完善 Provider 401/settings revision 处理，旧 invariant companion 改为无依赖 no-op。
+
+升级到本版可在 TUI 中执行 `/update` 后重启，或重跑上方的 `plugin add` 命令。完整版本历史见 [CHANGELOG.md](CHANGELOG.md)，TUI 内可输入 `/changelog` 查看。
 
 ## 文档
 
@@ -154,7 +156,6 @@ pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-t
 - `ask_image` 图片再询问需要同仓伴生插件 [`vision-ask`](vision-ask/README.md)；基础图片提交与视觉桥不依赖它。
 - LSP server 采用懒启动；大型仓库可能常驻较多内存，切换会话时 `rootUri` 仍沿用首个会话目录。
 - 上游 schedule 依赖 Web `sessionController`，当前 TUI 未挂载该工具面。
-- `0.2.2-alpha.2` 的模型选择与预设 API 已发生变化，完成专项适配前请停留在宿主 `0.2.1-rc.4`。
 
 ## 参与贡献
 
@@ -188,4 +189,4 @@ npm run build
 
 ## 许可与来源
 
-基于 [Apache-2.0](LICENSE) 开源。终端渲染引擎从作者的[天枢 Tianshu-harness](https://github.com/huiliyi37/Tianshu-harness) 演进而来；逐文件来源与修改声明见 [SOURCE-MAP.md](SOURCE-MAP.md) 和 [NOTICE](NOTICE)。
+基于 [Apache-2.0](LICENSE) 开源。终端渲染核心源自作者的 [Tianshu-harness](https://github.com/huiliyi37/Tianshu-harness) 项目并持续演进，文件级来源与修改说明见 [SOURCE-MAP.md](SOURCE-MAP.md) 和 [NOTICE](NOTICE)。

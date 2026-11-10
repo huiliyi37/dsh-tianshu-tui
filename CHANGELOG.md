@@ -3,6 +3,26 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
+## [1.0.0-rc.5] - 2026-11-10
+
+### 宿主 0.2.2-rc.1 与精确依赖契约
+
+- 官方 `@deepseek-ai/dsh-*` peer/dev/runtime 依赖全部精确对齐 `0.2.2-rc.1`；Cordis 对齐 `~4.1.0`，include/loader `~1.1.0`，timer `~1.2.0`，schemastery `~3.19.0`，Node 要求提升为 `>=24.9.0`。宿主 npm `latest` 与 `next` 均已指向 `0.2.2-rc.1`，不再保留旧标签或 alpha 不兼容警告。
+- 新增 PTC executor 运行依赖及 native/group 测试依赖；退役的 `@deepseek-ai/dsh-invariants` 从 peer/dev 移除，保留 LSP 闭包所需的 `@huiliyi37/dsh-invariants`。
+
+### Preset、AgentModel 与工具展示
+
+- 四个 preset 对齐官方 rc.1 形状：清理旧 `list-agents`、`modelSelectionSettings` 和 deprecated presentation，接入 `modelSelection` / `modelDiscovery` 与 `tool-executor-ptc`，修复 PTC 工具执行路径。
+- 模型路由迁移到 `AgentModel` 持久化：按 pending → lastUsed → options 恢复，普通 resume 不再覆盖尚未使用的选择；`/effort` 正确展示并保留 pending route+effort，`/btw` 显式继承父 Agent 的 pending route+effort，兼容缺少完整模型面的 Agent 替身。
+- 工具卡 presenter 在 live 与 replay 均传入当前 Agent scope，结构化 diff/terminal 卡按调用所属 Agent 解析；缺失 Agent 或 presenter 时保留文本卡降级。
+
+### Provider 与 invariant 兼容
+
+- Key/Provider 探测将 401/403 明确归类为无效凭据；Provider 保存和 Key afterSave 激活按同一 settings revision 提交，冲突可见且不误报成功，settings 仍只保存 `apiKeyEnv`，不写明文密钥。
+- invariant companion 保留发布路径与插件导出，改为不依赖官方退役包的 no-op：不再注入或注册 invariant 服务，并增加构建与发布契约护栏。
+
+验证：typecheck、lint（0 errors）、build；主仓 2827/2827、vision-ask 32/32；standard / ptc / minimal / cordis 四个 preset 的真实工具结果，以及真实模型路由、Provider 验收均通过；原版 expect TUI E2E 全部通过。
+
 ## [1.0.0-rc.4] - 2026-10-29
 
 ### Provider 接入与自定义端点（#61）

@@ -19,12 +19,20 @@ node scripts/dev.mjs    # 同等逻辑的跨平台入口（Windows 主入口；v
 dsh-tui/                        本仓库
 ├── scripts/dev.sh              启动脚本（入库）
 ├── vendor/dsh-runtime/        官方 CLI 依赖树，342M（gitignore，不进仓库）
-│   └── node_modules/@deepseek-ai/dsh/lib/bin.js   宿主 CLI 入口（0.2.1-rc.4）
+│   └── node_modules/@deepseek-ai/dsh/lib/bin.js   宿主 CLI 入口（实际版本以实测为准）
 ├── .dsh-dev/                  本地开发 profile 家目录（gitignore），DSH_HOME 指向这里
 │   └── profiles/tui/          装配结果：bundles = [@deepseek-ai/dsh-base, @huiliyi37/dsh-tianshu-tui]
 │       └── node_modules/      本插件以 link: 指向本仓库根（build 后即时生效）
 └── .pnpm-store/               pnpm 共享缓存 235M（gitignore，可删，删后需重装配）
 ```
+
+当前适配目标是宿主 `0.2.2-rc.1`，但这不表示现有 `vendor/` 已经升级到该版本。实际版本以以下命令的输出为准：
+
+```sh
+node vendor/dsh-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js --version
+```
+
+仓库依赖或文档升级不会自动升级已有 `vendor/` 与 `.dsh-dev/` 中的 profile；不要用旧 profile 的启动结果判断 rc.1 兼容性，也不要为了升级直接覆盖或删除它们。
 
 关键环境变量：
 - `DSH_HOME=$ROOT/.dsh-dev` —— profile 家目录隔离，**不碰**全局 `~/.dsh`
@@ -32,26 +40,38 @@ dsh-tui/                        本仓库
 
 ## 三、首次装配与重建
 
+### 使用官方 0.2.2-rc.1 与新隔离 DSH_HOME
+
+以下路径使用精确版本的官方 CLI/base 和全新的临时 `DSH_HOME`，只链接当前仓库，不读取或改写现有 `vendor/`、`.dsh-dev/`：
+
+```sh
+ROOT="$PWD"
+NEW_DSH_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dsh-tianshu-dsh-0.2.2-rc.1.XXXXXX")"
+DSH_HOME="$NEW_DSH_HOME" pnpm dlx @deepseek-ai/dsh@0.2.2-rc.1 \
+  plugin --profile tui add "@deepseek-ai/dsh-base@0.2.2-rc.1" "link:$ROOT"
+DSH_HOME="$NEW_DSH_HOME" pnpm dlx @deepseek-ai/dsh@0.2.2-rc.1 --profile tui
+```
+
 首次运行 `dev.sh` 自动装配（需网络一次）：
 
 ```sh
 node vendor/dsh-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js \
-  plugin --profile tui add "@deepseek-ai/dsh-base@0.2.1-rc.4" "link:$ROOT"
+  plugin --profile tui add "@deepseek-ai/dsh-base@0.2.2-rc.1" "link:$ROOT"
 ```
 
 - 机制：`dsh plugin add` = 在 profile 目录跑 `pnpm <args>` + reconcile `dsh.profile.bundles`；profile 模块解析 fallback 到 CLI 安装锚点，所以运行时所有 `@deepseek-ai/*` 从 vendor 树解析。
-- ⚠ **pnpm ≥ 11.7 的 allowBuilds 坑（0.2.1 线）**：宿主依赖树含 node-pty 等原生构建脚本，未裁决时 pnpm 以 exit 1 失败 → `plugin add` 报 `plugin command failed`，且可能留下「dep 已装但 bundle 未登记」的半截 profile（启动无 TUI 无报错）。修法：把 profile `pnpm-workspace.yaml` 的 `allowBuilds` 占位逐条填掉（`@deepseek-ai/dsh-subprocess-local: true`——它只是 chmod node-pty 预编译 helper；其余可 `false`，node-pty 自带 prebuilds 无需编译），然后 `plugin remove` + `plugin add` 重跑（reconcile 只登记新增依赖）。`install-tui.sh/ps1` 已内置这套自动修复。
+- ⚠ **pnpm ≥ 11.7 的 allowBuilds 坑（0.2.2 线）**：宿主依赖树含 node-pty 等原生构建脚本，未裁决时 pnpm 以 exit 1 失败 → `plugin add` 报 `plugin command failed`，且可能留下「dep 已装但 bundle 未登记」的半截 profile（启动无 TUI 无报错）。修法：把 profile `pnpm-workspace.yaml` 的 `allowBuilds` 占位逐条填掉（`@deepseek-ai/dsh-subprocess-local: true`——它只是 chmod node-pty 预编译 helper；其余可 `false`，node-pty 自带 prebuilds 无需编译），然后 `plugin remove` + `plugin add` 重跑（reconcile 只登记新增依赖）。`install-tui.sh/ps1` 已内置这套自动修复。
 - 换机器/清掉 vendor 后重建（pnpm 平铺安装，与 npx/npm 布局一致）：
   ```sh
   mkdir -p /tmp/dsh-rt && cd /tmp/dsh-rt && echo '{"name":"dsh-rt","private":true}' > package.json \
-    && printf 'node-linker=hoisted\n' > .npmrc && pnpm add @deepseek-ai/dsh@0.2.1-rc.4
+    && printf 'node-linker=hoisted\n' > .npmrc && pnpm add @deepseek-ai/dsh@0.2.2-rc.1
   mkdir -p vendor/dsh-runtime && cp -R /tmp/dsh-rt/node_modules vendor/dsh-runtime/node_modules
   ```
   （CLI 须与 dsh-base 同线：跨线装配会在 plugin tree 加载时报服务/导出名缺失；pnpm 默认布局是 .pnpm 软链树，必须 `node-linker=hoisted` 才能平铺拷贝）
 - 跨平台替代：`node scripts/dev.mjs` 在 vendor 缺失时自动定位 npx 缓存并拷贝
   （POSIX `~/.npm/_npx`、Windows `%LocalAppData%\npm-cache\_npx`），无需手工 cp；
   上述 cp 命令仅适用于 POSIX 手工路径。注意 npx 缓存若是无版本运行所得可能落在
-  别的线（如 0.1.2-alpha），与本仓库依赖线（0.2.1-rc.4）不符时会启动即崩——以本节版本为准。
+  别的线（如 0.1.2-alpha），与本仓库依赖线（0.2.2-rc.1）不符时会启动即崩——以本节版本为准。
 
 ## 四、当前环境信息快照（2026-08-16）
 

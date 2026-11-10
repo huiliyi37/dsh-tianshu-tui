@@ -5,12 +5,12 @@ dsh-tianshu-tui 是官方 DeepSeek Harness 的交互式终端 UI 插件。本文
 
 ## 前置条件
 
-- [Node.js](https://nodejs.org/) `^22.19 || >=24`
+- [Node.js](https://nodejs.org/) `>=24.9.0`
 - PATH 上有 [`pnpm`](https://pnpm.io/installation)(`dsh plugin` 会转发给它)
 - 运行模型需要 API key:环境变量 `DEEPSEEK_API_KEY`(或用官方 CLI 的登录流程)
 
 > **不要直接敲 `dsh`。** 若 PATH 上已有旧的 `dsh`(如 `~/.local/bin/dsh`,
-> `dsh --version` 低于 `0.2.1-rc.4`),会走到本地 staging,出现 `ERR_FS_EISDIR` /
+> `dsh --version` 低于 `0.2.2-rc.1`),会走到本地 staging,出现 `ERR_FS_EISDIR` /
 > `Path is a directory .../@deepseek-ai/dsh`。请始终用下面的 `npx` 命令。
 
 ## 安装
@@ -59,8 +59,8 @@ DSH_HOME=/tmp/dsh-tianshu npx -y @deepseek-ai/dsh@next plugin --profile tui add 
 DSH_HOME=/tmp/dsh-tianshu npx -y @deepseek-ai/dsh@next --profile tui
 ```
 
-**`plugin add` 报 `plugin command failed`（pnpm ≥ 11.7 / 0.2.1 宿主）**
-0.2.1 宿主依赖树含原生构建脚本（node-pty 等），pnpm ≥ 11.7 对未裁决的构建以
+**`plugin add` 报 `plugin command failed`（pnpm ≥ 11.7 / 0.2.2 宿主）**
+0.2.2 宿主依赖树含原生构建脚本（node-pty 等），pnpm ≥ 11.7 对未裁决的构建以
 exit 1 失败。打开 `$DSH_HOME/profiles/tui/pnpm-workspace.yaml`，把 `allowBuilds`
 段的占位值（`set this to true or false`）逐条改成 `false`（保留
 `@deepseek-ai/dsh-subprocess-local: true`——它只负责 chmod node-pty 的预编译

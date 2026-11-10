@@ -35,12 +35,12 @@ It is a **presentation-only plugin**: agent state comes from the session event s
 
 | Component | Currently validated version |
 |---|---|
-| Node.js | `^22.19 || >=24` |
+| Node.js | `>=24.9.0` |
 | Package manager | [`pnpm`](https://pnpm.io/installation), available through `corepack enable` |
-| DeepSeek Harness | `@deepseek-ai/dsh@0.2.1-rc.4`, published on the npm `next` channel |
-| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.4` |
+| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.1`, published on both the npm `latest` and `next` channels |
+| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.5` |
 
-> **Use the host `@next` tag explicitly.** Do not substitute the host `@latest` tag (currently `0.2.1-rc.2`, below the required version). The `@alpha` release `0.2.2-alpha.2` has known API incompatibilities and is not supported yet. This package is not a standalone CLI.
+> The host's npm `latest` and `next` tags both currently point to `0.2.2-rc.1`. The install commands keep `@next` explicit to avoid an older global CLI. This package is not a standalone CLI.
 
 ### One-click install (recommended)
 
@@ -99,7 +99,7 @@ Follow the first-run guide to configure an API key, or enter `/key`. The **dsh-t
 | `Ctrl+.` | Full keymap |
 | `Ctrl+F` / `Ctrl+R` | History search; `n`/`N` next, `p`/`P` previous |
 | `Ctrl+O` | Expand/collapse the latest reasoning block |
-| `Ctrl+E` | Edit the input line in `$EDITOR` |
+| `Ctrl+E` | Edit the input line with `$EDITOR` |
 | `Ctrl+T` | Steer the active turn |
 | `Ctrl+Enter` | Interrupt the active turn and send the draft (requires kitty keyboard protocol) |
 | `Ctrl+C` | Interrupt the active turn; double-press on idle empty input to exit |
@@ -124,7 +124,9 @@ npm installs check for updates at startup. You can also run `/update` inside the
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-Current release: **[`1.0.0-rc.4`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.4)**, adapted to host `0.2.1-rc.4`. This release fixes [#61](https://github.com/huiliyi37/dsh-tianshu-tui/issues/61): WSL/native API-key paste, provider directory and account entry behavior, plus custom pi-ai endpoints, model discovery, and existing-route editing. See [CHANGELOG.md](CHANGELOG.md) for release history, or run `/changelog` inside the TUI.
+Current release: **[`1.0.0-rc.5`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.5)**, adapted to host `0.2.2-rc.1`. This release aligns official dsh peers, Cordis `~4.1.0`, and Node `>=24.9.0`; fixes the four presets, legacy `list-agents` removal, and PTC executor wiring; migrates model routing to persistent AgentModel state and fixes `/effort` and `/btw`; passes the current Agent scope to tool presenters; improves Provider 401/settings-revision handling; and turns the old invariant companion into a dependency-free no-op.
+
+Upgrade by running `/update` and restarting, or rerun the `plugin add` command above. See [CHANGELOG.md](CHANGELOG.md) for the full release history, or run `/changelog` inside the TUI.
 
 ## Documentation
 
@@ -153,7 +155,6 @@ See the [architecture guide](docs/architecture.en.md) and [ADAPTER.md](ADAPTER.m
 - Re-interrogating images with `ask_image` requires the companion [`vision-ask`](vision-ask/README.md) plugin; basic image submission and vision bridging do not.
 - LSP servers start lazily but may remain resident in large repositories; `rootUri` follows the first session's working directory after a session switch.
 - Upstream schedule depends on the Web `sessionController`, so this TUI does not mount that tool surface yet.
-- Host `0.2.2-alpha.2` changes model-selection and preset APIs. Stay on host `0.2.1-rc.4` until dedicated adaptation work is complete.
 
 ## Contributing
 

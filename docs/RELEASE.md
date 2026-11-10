@@ -2,7 +2,7 @@
 
 后续发版**只按本文**执行。历史筹备清单见 [PUBLISH-PLAN.md](PUBLISH-PLAN.md)（已过期，不要当步骤跑）。
 
-当前线上：`@huiliyi37/dsh-tianshu-tui@1.0.0-rc.4`（npm `latest`）。发版后更新此行。
+当前线上：`@huiliyi37/dsh-tianshu-tui@1.0.0-rc.5`（npm `latest`）。发版后更新此行。
 
 ## 仓库坐标
 
@@ -21,9 +21,9 @@
 
 - 插件 id 固定 `tui-runner`。
 - 包名固定 `@huiliyi37/dsh-tianshu-tui`（不要改成 `@deepseek-ai/*` 或 `@dsh-external/*`）。
-- 发版本包时只 bump 根 `package.json` 的 `"version"`。不要顺手 bump `peerDependencies` 里的官方 `@deepseek-ai/*`（宿主适配任务除外；当前宿主 CLI 线为 `^0.2.1-rc.4`）。
+- 发版本包时只 bump 根 `package.json` 的 `"version"`，并同步 `package-lock.json` 顶层和根包版本。不要顺手 bump `peerDependencies` 里的官方 `@deepseek-ai/*`（宿主适配任务除外；当前宿主 CLI 线精确为 `0.2.2-rc.1`，Cordis 为 `~4.1.0`，Node 为 `>=24.9.0`）。
 - 不要 bump `vision-ask/`，除非这次明确发那个包。
-- README 里写的官方 CLI `0.2.1-rc.4` 是宿主版本，不是本包版本。
+- README 里写的官方 CLI `0.2.2-rc.1`（npm `latest` / `next` 均指向此版本）是宿主版本，不是本包版本。
 - `lib/index.js` / `lib/invariant.js` **必须跟仓**（github / npm 安装吃 bundle，不在宿主里再打包）。改了 `src/` 就要同步 bundle。
 - 不要提交 `.npmrc` / token。
 - 不要 force-push `main`。
@@ -48,7 +48,7 @@ npm publish --access public --tag latest
 
 ### 1. 定版本
 
-改且只改根 `package.json` 的 `"version"`。建议沿 `0.1.x-rc.n` 或用户指定的 semver。
+只修改根 `package.json` 的 `"version"`，并同步 `package-lock.json` 顶层和根包版本。建议沿当前 `1.0.x-rc.n`，或使用用户指定的 `<version>`。
 
 ### 2. 跟仓 bundle
 

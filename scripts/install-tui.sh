@@ -19,13 +19,12 @@ export npm_config_registry="$REGISTRY"
 say() { printf '\033[1;36m== %s ==\033[0m\n' "$*"; }
 die() { printf '\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 
-# 1. node（^22.19 || >=24）
+# 1. node（>=24.9.0）
 if ! command -v node >/dev/null 2>&1; then
-  die "缺少 Node.js（^22.19 || >=24）。请先安装：https://nodejs.org/"
+  die "缺少 Node.js（>=24.9.0）。请先安装：https://nodejs.org/"
 fi
-NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
-if [ "$NODE_MAJOR" -lt 22 ]; then
-  die "Node.js 版本过低（当前 $(node -v)，需要 ^22.19 || >=24）。请升级后重跑。"
+if ! node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 24 || (major === 24 && minor >= 9) ? 0 : 1)'; then
+  die "Node.js 版本过低（当前 $(node -v)，需要 >=24.9.0）。请升级后重跑。"
 fi
 
 # 2. pnpm（没有则用 corepack 启用——Node 自带）
@@ -37,7 +36,7 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 # 3. 官方 CLI（经 pnpm dlx，绕过 npm 11 的 OOM）
-# 当前适配 0.2.1-rc.4：显式跟随 @next，避免落到旧全局 CLI。
+# 当前适配 0.2.2-rc.1：显式跟随 @next，避免落到旧全局 CLI。
 DSH="pnpm dlx @deepseek-ai/dsh@next"
 
 say "安装官方 dsh CLI（pnpm，registry=${REGISTRY}）"
@@ -48,7 +47,7 @@ fi
 # 4. 装配 tui 插件（幂等：重复执行会覆盖更新到最新）
 say "装配 tui 插件（@huiliyi37/dsh-tianshu-tui）"
 if ! $DSH plugin --profile tui add @huiliyi37/dsh-tianshu-tui; then
-  # pnpm ≥ 11.7 对未裁决的原生构建 exit 1（0.2.1 宿主树含 node-pty 等）：
+  # pnpm ≥ 11.7 对未裁决的原生构建 exit 1（0.2.2 宿主树含 node-pty 等）：
   # 把 profile 生成的 pnpm-workspace.yaml 里 allowBuilds 占位填掉再重试一次。
   # dsh-subprocess-local 保留 true（只 chmod node-pty 预编译 helper），其余 false。
   WS="${DSH_HOME:-$HOME/.dsh}/profiles/tui/pnpm-workspace.yaml"
