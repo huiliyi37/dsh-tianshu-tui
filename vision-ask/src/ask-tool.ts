@@ -180,7 +180,8 @@ async function describeImage(
   }
   const finish = assembler.finish
   if (finish.kind === 'error' || finish.kind === 'aborted') {
-    throw new LlmError(finish.failure.message, finish.failure.code)
+    // 视觉 provider 的 code 由本适配器自定（不保证是内置码），按 failure 原样重抛。
+    throw LlmError.fromFailure(finish.failure)
   }
   const text = assembler.blocks()
     .filter(block => block.type === 'text')

@@ -3,6 +3,17 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
+## [Unreleased]
+
+### 宿主 0.2.2-rc.3 适配
+
+- 官方 `@deepseek-ai/dsh-*` peer/dev/runtime 依赖由 `0.2.2-rc.1` 精确提升到 `0.2.2-rc.3`（宿主 npm `next` 已指向此版本，`latest` 仍停在 `0.2.2-rc.1`）。Cordis `~4.1.0`、include/loader `~1.1.0`、timer `~1.2.0`、schemastery `~3.19.0`、Node `>=24.9.0` 均无需变动。
+- `dsh-llm` 收紧 `LlmError` 构造签名的 code 参数：从任意 `string` 收为 `BuiltinLlmFailureCode`（内置失败码或 `HTTP_<status>`），并新增 `LlmError.fromFailure()` 供“其他 provider 自定 code”的失败原样重抛。vision-ask 两处随之调整：视觉调用的失败改走 `fromFailure`（不丢 provider 原始 code），视觉适配器的 HTTP 归类返回类型收窄为 `BuiltinLlmFailureCode`，无法归类时用 `HTTP_<status>` 取代原先从响应体截取的臆造码。
+- 宿主 bundle 增加 `dsh-cua-bundle`、`dsh-deepseek-chat-import`，移除 `dsh-experimental-agent-team-profile`；本包 `cordis.patch.yml` 未引用三者，装配无需改动。
+- `dsh-agent` 移除了运行时 ownership 面（`CreateAgentOptions.parentAgent`、`AgentRegistry.isOwnedBy`、`roots()`），父子关系改由持久化 session lineage 表达；本包为纯展示层，未使用这些入口。
+
+验证：typecheck（主仓 + vision-ask）、lint（0 errors）、build；主仓 2827/2827、vision-ask 32/32。
+
 ## [1.0.0-rc.5] - 2026-11-10
 
 ### 宿主 0.2.2-rc.1 与精确依赖契约

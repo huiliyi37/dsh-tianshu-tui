@@ -74,11 +74,11 @@ describe('published bundle contract', () => {
     })
   }
 
-  it('宿主包与工具链精确对齐 0.2.2-rc.1', () => {
+  it('宿主包与工具链精确对齐 0.2.2-rc.3', () => {
     for (const section of ['peerDependencies', 'devDependencies', 'dependencies'] as const) {
       for (const [name, version] of Object.entries(pkg[section])) {
         if (name.startsWith('@deepseek-ai/dsh-')) {
-          expect(version, `${section}.${name}`).toBe('0.2.2-rc.1')
+          expect(version, `${section}.${name}`).toBe('0.2.2-rc.3')
         }
       }
     }
@@ -93,8 +93,8 @@ describe('published bundle contract', () => {
   })
 
   it('PTC executor 随包发布，native/group 仅用于测试组合', () => {
-    expect(pkg.dependencies['@deepseek-ai/dsh-tool-executor-ptc']).toBe('0.2.2-rc.1')
-    expect(pkg.devDependencies['@deepseek-ai/dsh-tool-executor-native']).toBe('0.2.2-rc.1')
+    expect(pkg.dependencies['@deepseek-ai/dsh-tool-executor-ptc']).toBe('0.2.2-rc.3')
+    expect(pkg.devDependencies['@deepseek-ai/dsh-tool-executor-native']).toBe('0.2.2-rc.3')
     expect(pkg.devDependencies['@deepseek-ai/cordis-plugin-group']).toBe('~1.1.0')
   })
 
@@ -143,7 +143,7 @@ describe('published bundle contract', () => {
       '@deepseek-ai/dsh-tool-cordis',
       '@deepseek-ai/dsh-tool-executor-ptc',
     ]) {
-      expect(pkg.dependencies?.[name], `${name} must ship with the profile bundle`).toBe('0.2.2-rc.1')
+      expect(pkg.dependencies?.[name], `${name} must ship with the profile bundle`).toBe('0.2.2-rc.3')
     }
   })
 

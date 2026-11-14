@@ -16,6 +16,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { createUserMessage, LlmAdapter, LlmError } from '@deepseek-ai/dsh-llm'
 import type {
+  BuiltinLlmFailureCode,
   ContentBlock,
   FinishReason,
   GenerateOptions,
@@ -132,12 +133,13 @@ export function* translateChunk(chunk: WireChunk): Generator<StreamChunk> {
 }
 
 /** Classify a non-2xx wire error into a structured code. */
-function classifyHttpError(status: number, body: string): string {
+function classifyHttpError(status: number): BuiltinLlmFailureCode {
   if (status === 401 || status === 403) return 'AUTH'
   if (status === 429) return 'RATE_LIMIT'
   if (status >= 500) return 'SERVER'
   if (status === 400) return 'INVALID_REQUEST'
-  return body.length > 0 ? body.slice(0, 40).toUpperCase().replace(/\W+/g, '_') : String(status)
+  // 无法归类时用宿主认可的 HTTP_<status> 形态；响应体原文由调用方写进 message。
+  return `HTTP_${status}`
 }
 
 /** Serialize one user message: join text blocks, image blocks become `image_url` parts. */
@@ -267,7 +269,7 @@ export class VisionAdapter extends LlmAdapter {
       const text = await response.text().catch(() => '')
       throw new LlmError(
         `vision adapter HTTP ${response.status}: ${text.slice(0, 200)}`,
-        classifyHttpError(response.status, text),
+        classifyHttpError(response.status),
       )
     }
     // finish 由流层统一裁决：wire 的 finish_reason 只记录不转发，保证
