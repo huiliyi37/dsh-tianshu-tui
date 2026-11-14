@@ -33,7 +33,7 @@ lsp/                独立插件源码（@deepseek-ai/dsh-lsp，已迁出为社�
 ## 依赖前提
 
 peerDependencies 指向宿主相关 `@deepseek-ai/dsh-*`（精确 `0.2.2-rc.3`）与 `@deepseek-ai/cordis`（`~4.1.0`）。
-官方核心包与 CLI 的 npm `latest` / `next` 标签均指向 `0.2.2-rc.3`。`pnpm install`、`tsc`、`vitest` 可在能解析这些 peer 的环境运行（公开版
+官方核心包与 CLI 的 npm `next` 标签指向 `0.2.2-rc.3`（`latest` 仍停 `0.2.2-rc.1`）。`pnpm install`、`tsc`、`vitest` 可在能解析这些 peer 的环境运行（公开版
 monorepo 工作区：`pnpm exec tsc -b packages/tui/tui`、`pnpm vitest run packages/tui/tui/tests`）。
 vision-ask 的附件引用均为 type-only：行为测试可在任一解析 dsh-llm/dsh-tools 的
 工作区运行（`vitest run vision-ask/tests/`）；类型面在公开版环境复核。

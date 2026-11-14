@@ -38,10 +38,10 @@
 |---|---|
 | Node.js | `>=24.9.0` |
 | 包管理器 | [`pnpm`](https://pnpm.io/installation)，可由 `corepack enable` 启用 |
-| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.3`，npm `latest` / `next` 均指向此版本 |
+| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.3`（npm `next` 通道；`latest` 仍停 `0.2.2-rc.1`） |
 | 本插件 | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.5` |
 
-> 宿主 npm `latest` 与 `next` 当前均为 `0.2.2-rc.3`。安装命令继续显式使用 `@next`，避免落到旧全局 CLI；本包也不是可独立运行的 CLI。
+> 宿主 npm `next` 当前为 `0.2.2-rc.3`，`latest` 仍停 `0.2.2-rc.1`。安装命令继续显式使用 `@next`，避免落到旧全局 CLI；本包也不是可独立运行的 CLI。
 
 ### 一键安装（推荐）
 

@@ -37,10 +37,10 @@ It is a **presentation-only plugin**: agent state comes from the session event s
 |---|---|
 | Node.js | `>=24.9.0` |
 | Package manager | [`pnpm`](https://pnpm.io/installation), available through `corepack enable` |
-| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.3`, published on both the npm `latest` and `next` channels |
+| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.3`, published on the npm `next` channel (`latest` still `0.2.2-rc.1`) |
 | This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.5` |
 
-> The host's npm `latest` and `next` tags both currently point to `0.2.2-rc.3`. The install commands keep `@next` explicit to avoid an older global CLI. This package is not a standalone CLI.
+> The host's npm `next` tag currently points to `0.2.2-rc.3`; `latest` still points to `0.2.2-rc.1`. The install commands keep `@next` explicit to avoid an older global CLI. This package is not a standalone CLI.
 
 ### One-click install (recommended)
 
