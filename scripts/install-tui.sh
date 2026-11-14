@@ -36,7 +36,7 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 # 3. 官方 CLI（经 pnpm dlx，绕过 npm 11 的 OOM）
-# 当前适配 0.2.2-rc.1：显式跟随 @next，避免落到旧全局 CLI。
+# 当前适配 0.2.2-rc.3：显式跟随 @next，避免落到旧全局 CLI 或仍停在 0.2.2-rc.1 的 latest。
 DSH="pnpm dlx @deepseek-ai/dsh@next"
 
 say "安装官方 dsh CLI（pnpm，registry=${REGISTRY}）"

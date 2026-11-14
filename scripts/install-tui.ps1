@@ -39,7 +39,7 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
 }
 
 function Invoke-Dsh([string[]]$Args) {
-  # 当前适配 0.2.2-rc.1：显式跟随 @next，避免落到旧全局 CLI。
+  # 当前适配 0.2.2-rc.3：显式跟随 @next，避免落到旧全局 CLI 或仍停在 0.2.2-rc.1 的 latest。
   if (Get-Command pnpm -ErrorAction SilentlyContinue) {
     & pnpm dlx @deepseek-ai/dsh@next @Args
   } else {
