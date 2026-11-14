@@ -3,7 +3,7 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
-## [Unreleased]
+## [1.0.0-rc.6] - 2026-11-15
 
 ### 宿主 0.2.2-rc.3 适配
 

@@ -38,7 +38,7 @@ It is a **presentation-only plugin**: agent state comes from the session event s
 | Node.js | `>=24.9.0` |
 | Package manager | [`pnpm`](https://pnpm.io/installation), available through `corepack enable` |
 | DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.3`, published on the npm `next` channel (`latest` still `0.2.2-rc.1`) |
-| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.5` |
+| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.6` |
 
 > The host's npm `next` tag currently points to `0.2.2-rc.3`; `latest` still points to `0.2.2-rc.1`. The install commands keep `@next` explicit to avoid an older global CLI. This package is not a standalone CLI.
 
@@ -124,7 +124,7 @@ npm installs check for updates at startup. You can also run `/update` inside the
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-Current release: **[`1.0.0-rc.5`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.5)**, adapted to host `0.2.2-rc.3`. This release aligns official dsh peers, Cordis `~4.1.0`, and Node `>=24.9.0`; fixes the four presets, legacy `list-agents` removal, and PTC executor wiring; migrates model routing to persistent AgentModel state and fixes `/effort` and `/btw`; passes the current Agent scope to tool presenters; improves Provider 401/settings-revision handling; and turns the old invariant companion into a dependency-free no-op.
+Current release: **[`1.0.0-rc.6`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.6)**, adapted to host `0.2.2-rc.3` (npm `next` channel; `latest` still `0.2.2-rc.1`). This release pins the official `@deepseek-ai/dsh-*` dependencies from `0.2.2-rc.1` to `0.2.2-rc.3` and follows the tightened `LlmError` failure-code contract: vision-provider failures are re-raised through `fromFailure` so their original codes survive, and HTTP classification narrows to built-in codes plus `HTTP_<status>`. The host bundle's new `cua` / `deepseek-chat-import` rows and the retired `agent-team-profile` row do not touch this package's assembly.
 
 Upgrade by running `/update` and restarting, or rerun the `plugin add` command above. See [CHANGELOG.md](CHANGELOG.md) for the full release history, or run `/changelog` inside the TUI.
 
