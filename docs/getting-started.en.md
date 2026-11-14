@@ -8,22 +8,22 @@ dsh-tianshu-tui is an interactive terminal UI plugin for the official DeepSeek H
 - [`pnpm`](https://pnpm.io/installation) on your PATH (`dsh plugin` forwards to it)
 - An API key to run models: `DEEPSEEK_API_KEY` (or the official CLI's login flow)
 
-> **Do not type bare `dsh`.** If an old `dsh` is already on your PATH (e.g. `~/.local/bin/dsh` whose `dsh --version` is below `0.2.2-rc.3`), it will hit the local staging path and fail with `ERR_FS_EISDIR` / `Path is a directory .../@deepseek-ai/dsh`. Always use the `npx` commands below.
+> **Do not type bare `dsh`.** If an old `dsh` is already on your PATH (e.g. `~/.local/bin/dsh` whose `dsh --version` is below `0.2.2-rc.3`), it will hit the local staging path and fail with `ERR_FS_EISDIR` / `Path is a directory .../@deepseek-ai/dsh`. Always use the `pnpm dlx` commands below.
 
 ## Install
 
 ```sh
 # 1. Add the plugin to the tui profile
-npx -y @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
+pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 
 # 2. Launch
-npx -y @deepseek-ai/dsh@next --profile tui
+pnpm dlx @deepseek-ai/dsh@next --profile tui
 ```
 
 You are up when the welcome page shows the **dsh-tianshu-tui** brand. Exit with `Ctrl+Q` or `/exit`.
 
 - pnpm may warn about missing peers — ignore it: peers are provided by the official `dsh` host.
-- If the official CLI is installed globally with the right version, replace `npx -y @deepseek-ai/dsh@next` with `dsh`.
+- If the official CLI is installed globally with the right version, replace `pnpm dlx @deepseek-ai/dsh@next` with `dsh`.
 - Install from Git: `dsh plugin --profile tui add github:huiliyi37/dsh-tianshu-tui`.
 
 ## First Run
@@ -51,8 +51,8 @@ Type a question and press Enter to start. Common operations:
 A stale install fallback in `~/.dsh/profiles/node_modules` conflicts with the official CLI. Use a clean directory:
 
 ```sh
-DSH_HOME=/tmp/dsh-tianshu npx -y @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
-DSH_HOME=/tmp/dsh-tianshu npx -y @deepseek-ai/dsh@next --profile tui
+DSH_HOME=/tmp/dsh-tianshu pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
+DSH_HOME=/tmp/dsh-tianshu pnpm dlx @deepseek-ai/dsh@next --profile tui
 ```
 
 **"插件已更新到 …，请重启 dsh 后生效" (plugin updated, please restart)**

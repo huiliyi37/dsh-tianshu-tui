@@ -211,4 +211,26 @@ describe('VisionAdapter.stream', () => {
       for await (const _ of adapter.stream({ provider: 'vision-ask', model: 'vl-1', messages: [message()] })) { /* drain */ }
     }).rejects.toMatchObject({ code: 'AUTH' })
   })
+
+  it('HTTP 429 → 内置 RATE_LIMIT 码', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"error":"rate limited"}', { status: 429 }))
+    vi.stubGlobal('fetch', fetchMock)
+    process.env.VISION_KEY = 'k'
+    const adapter = new VisionAdapter(mockCtx(), CONFIG)
+    await expect(async () => {
+      for await (const _ of adapter.stream({ provider: 'vision-ask', model: 'vl-1', messages: [message()] })) { /* drain */ }
+    }).rejects.toMatchObject({ code: 'RATE_LIMIT' })
+  })
+
+  it('无法归类的 HTTP 状态 → HTTP_<status> 内置形态', async () => {
+    // 418 不落在 401/403/429/5xx/400 任一分支，走兜底；宿主接受 `HTTP_<number>` 形态，
+    // 不再从响应体截字符臆造码。
+    const fetchMock = vi.fn(async () => new Response('teapot says no', { status: 418 }))
+    vi.stubGlobal('fetch', fetchMock)
+    process.env.VISION_KEY = 'k'
+    const adapter = new VisionAdapter(mockCtx(), CONFIG)
+    await expect(async () => {
+      for await (const _ of adapter.stream({ provider: 'vision-ask', model: 'vl-1', messages: [message()] })) { /* drain */ }
+    }).rejects.toMatchObject({ code: 'HTTP_418' })
+  })
 })

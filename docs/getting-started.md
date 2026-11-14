@@ -11,22 +11,22 @@ dsh-tianshu-tui 是官方 DeepSeek Harness 的交互式终端 UI 插件。本文
 
 > **不要直接敲 `dsh`。** 若 PATH 上已有旧的 `dsh`(如 `~/.local/bin/dsh`,
 > `dsh --version` 低于 `0.2.2-rc.3`),会走到本地 staging,出现 `ERR_FS_EISDIR` /
-> `Path is a directory .../@deepseek-ai/dsh`。请始终用下面的 `npx` 命令。
+> `Path is a directory .../@deepseek-ai/dsh`。请始终用下面的 `pnpm dlx` 命令。
 
 ## 安装
 
 ```sh
 # 1. 把插件装进 tui profile
-npx -y @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
+pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 
 # 2. 启动
-npx -y @deepseek-ai/dsh@next --profile tui
+pnpm dlx @deepseek-ai/dsh@next --profile tui
 ```
 
 看到欢迎页品牌 **dsh-tianshu-tui** 即成功。`Ctrl+Q` 或 `/exit` 退出。
 
 - pnpm 可能提示 peer missing,可忽略:peer 由官方 `dsh` 宿主提供。
-- 已全局安装官方 CLI 且版本正确时,把 `npx -y @deepseek-ai/dsh@next` 换成 `dsh`。
+- 已全局安装官方 CLI 且版本正确时,把 `pnpm dlx @deepseek-ai/dsh@next` 换成 `dsh`。
 - 从 Git 安装:`dsh plugin --profile tui add github:huiliyi37/dsh-tianshu-tui`。
 
 ## 首次使用
@@ -55,8 +55,8 @@ npx -y @deepseek-ai/dsh@next --profile tui
 `~/.dsh/profiles/node_modules` 里有旧的安装 fallback 与官方 CLI 冲突。换干净目录:
 
 ```sh
-DSH_HOME=/tmp/dsh-tianshu npx -y @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
-DSH_HOME=/tmp/dsh-tianshu npx -y @deepseek-ai/dsh@next --profile tui
+DSH_HOME=/tmp/dsh-tianshu pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
+DSH_HOME=/tmp/dsh-tianshu pnpm dlx @deepseek-ai/dsh@next --profile tui
 ```
 
 **`plugin add` 报 `plugin command failed`（pnpm ≥ 11.7 / 0.2.2 宿主）**
