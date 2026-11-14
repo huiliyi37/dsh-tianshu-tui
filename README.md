@@ -38,10 +38,10 @@
 |---|---|
 | Node.js | `>=24.9.0` |
 | 包管理器 | [`pnpm`](https://pnpm.io/installation)，可由 `corepack enable` 启用 |
-| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.1`，npm `latest` / `next` 均指向此版本 |
+| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.3`，npm `latest` / `next` 均指向此版本 |
 | 本插件 | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.5` |
 
-> 宿主 npm `latest` 与 `next` 当前均为 `0.2.2-rc.1`。安装命令继续显式使用 `@next`，避免落到旧全局 CLI；本包也不是可独立运行的 CLI。
+> 宿主 npm `latest` 与 `next` 当前均为 `0.2.2-rc.3`。安装命令继续显式使用 `@next`，避免落到旧全局 CLI；本包也不是可独立运行的 CLI。
 
 ### 一键安装（推荐）
 
@@ -125,7 +125,7 @@ pnpm dlx @deepseek-ai/dsh@next --profile tui
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-当前版本：**[`1.0.0-rc.5`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.5)**，适配宿主 `0.2.2-rc.1`。本版精确对齐官方 dsh peer、Cordis `~4.1.0` 与 Node `>=24.9.0`；修复四预设、旧 `list-agents` 清理与 PTC executor 接线，迁移到 AgentModel 持久化并修复 `/effort`、`/btw`；工具卡使用当前 Agent scope 的 presenter，同时完善 Provider 401/settings revision 处理，旧 invariant companion 改为无依赖 no-op。
+当前版本：**[`1.0.0-rc.5`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.5)**，适配宿主 `0.2.2-rc.3`。本版精确对齐官方 dsh peer、Cordis `~4.1.0` 与 Node `>=24.9.0`；修复四预设、旧 `list-agents` 清理与 PTC executor 接线，迁移到 AgentModel 持久化并修复 `/effort`、`/btw`；工具卡使用当前 Agent scope 的 presenter，同时完善 Provider 401/settings revision 处理，旧 invariant companion 改为无依赖 no-op。
 
 升级到本版可在 TUI 中执行 `/update` 后重启，或重跑上方的 `plugin add` 命令。完整版本历史见 [CHANGELOG.md](CHANGELOG.md)，TUI 内可输入 `/changelog` 查看。
 

@@ -26,7 +26,7 @@ dsh-tui/                        本仓库
 └── .pnpm-store/               pnpm 共享缓存 235M（gitignore，可删，删后需重装配）
 ```
 
-当前适配目标是宿主 `0.2.2-rc.1`，但这不表示现有 `vendor/` 已经升级到该版本。实际版本以以下命令的输出为准：
+当前适配目标是宿主 `0.2.2-rc.3`，但这不表示现有 `vendor/` 已经升级到该版本。实际版本以以下命令的输出为准：
 
 ```sh
 node vendor/dsh-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js --version
@@ -40,23 +40,23 @@ node vendor/dsh-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js --version
 
 ## 三、首次装配与重建
 
-### 使用官方 0.2.2-rc.1 与新隔离 DSH_HOME
+### 使用官方 0.2.2-rc.3 与新隔离 DSH_HOME
 
 以下路径使用精确版本的官方 CLI/base 和全新的临时 `DSH_HOME`，只链接当前仓库，不读取或改写现有 `vendor/`、`.dsh-dev/`：
 
 ```sh
 ROOT="$PWD"
-NEW_DSH_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dsh-tianshu-dsh-0.2.2-rc.1.XXXXXX")"
-DSH_HOME="$NEW_DSH_HOME" pnpm dlx @deepseek-ai/dsh@0.2.2-rc.1 \
-  plugin --profile tui add "@deepseek-ai/dsh-base@0.2.2-rc.1" "link:$ROOT"
-DSH_HOME="$NEW_DSH_HOME" pnpm dlx @deepseek-ai/dsh@0.2.2-rc.1 --profile tui
+NEW_DSH_HOME="$(mktemp -d "${TMPDIR:-/tmp}/dsh-tianshu-dsh-0.2.2-rc.3.XXXXXX")"
+DSH_HOME="$NEW_DSH_HOME" pnpm dlx @deepseek-ai/dsh@0.2.2-rc.3 \
+  plugin --profile tui add "@deepseek-ai/dsh-base@0.2.2-rc.3" "link:$ROOT"
+DSH_HOME="$NEW_DSH_HOME" pnpm dlx @deepseek-ai/dsh@0.2.2-rc.3 --profile tui
 ```
 
 首次运行 `dev.sh` 自动装配（需网络一次）：
 
 ```sh
 node vendor/dsh-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js \
-  plugin --profile tui add "@deepseek-ai/dsh-base@0.2.2-rc.1" "link:$ROOT"
+  plugin --profile tui add "@deepseek-ai/dsh-base@0.2.2-rc.3" "link:$ROOT"
 ```
 
 - 机制：`dsh plugin add` = 在 profile 目录跑 `pnpm <args>` + reconcile `dsh.profile.bundles`；profile 模块解析 fallback 到 CLI 安装锚点，所以运行时所有 `@deepseek-ai/*` 从 vendor 树解析。
@@ -64,14 +64,14 @@ node vendor/dsh-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js \
 - 换机器/清掉 vendor 后重建（pnpm 平铺安装，与 npx/npm 布局一致）：
   ```sh
   mkdir -p /tmp/dsh-rt && cd /tmp/dsh-rt && echo '{"name":"dsh-rt","private":true}' > package.json \
-    && printf 'node-linker=hoisted\n' > .npmrc && pnpm add @deepseek-ai/dsh@0.2.2-rc.1
+    && printf 'node-linker=hoisted\n' > .npmrc && pnpm add @deepseek-ai/dsh@0.2.2-rc.3
   mkdir -p vendor/dsh-runtime && cp -R /tmp/dsh-rt/node_modules vendor/dsh-runtime/node_modules
   ```
   （CLI 须与 dsh-base 同线：跨线装配会在 plugin tree 加载时报服务/导出名缺失；pnpm 默认布局是 .pnpm 软链树，必须 `node-linker=hoisted` 才能平铺拷贝）
 - 跨平台替代：`node scripts/dev.mjs` 在 vendor 缺失时自动定位 npx 缓存并拷贝
   （POSIX `~/.npm/_npx`、Windows `%LocalAppData%\npm-cache\_npx`），无需手工 cp；
   上述 cp 命令仅适用于 POSIX 手工路径。注意 npx 缓存若是无版本运行所得可能落在
-  别的线（如 0.1.2-alpha），与本仓库依赖线（0.2.2-rc.1）不符时会启动即崩——以本节版本为准。
+  别的线（如 0.1.2-alpha），与本仓库依赖线（0.2.2-rc.3）不符时会启动即崩——以本节版本为准。
 
 ## 四、当前环境信息快照（2026-08-16）
 

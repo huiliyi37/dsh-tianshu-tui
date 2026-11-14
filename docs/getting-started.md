@@ -10,7 +10,7 @@ dsh-tianshu-tui 是官方 DeepSeek Harness 的交互式终端 UI 插件。本文
 - 运行模型需要 API key:环境变量 `DEEPSEEK_API_KEY`(或用官方 CLI 的登录流程)
 
 > **不要直接敲 `dsh`。** 若 PATH 上已有旧的 `dsh`(如 `~/.local/bin/dsh`,
-> `dsh --version` 低于 `0.2.2-rc.1`),会走到本地 staging,出现 `ERR_FS_EISDIR` /
+> `dsh --version` 低于 `0.2.2-rc.3`),会走到本地 staging,出现 `ERR_FS_EISDIR` /
 > `Path is a directory .../@deepseek-ai/dsh`。请始终用下面的 `npx` 命令。
 
 ## 安装
