@@ -18,6 +18,7 @@ import { runSelfUpdate } from './self-update.js'
 import { spawnSelfRestart } from './restart.js'
 import { loadCustomThemes } from './theme-custom.js'
 import { TuiApp } from './ui/app.js'
+import { installHostStderrGuard, shouldInstallHostStderrGuard } from './host-stderr-guard.js'
 
 /** Stable Cordis plugin name the bundle patch inserts. */
 export const name = 'tui-runner'
@@ -79,6 +80,11 @@ export interface TuiRunnerConfig {
  * @param config - stream injection and starting session (defaults to process).
  */
 export function apply(ctx: Context, config: TuiRunnerConfig = {}): void {
+  // 占用 TTY 期间拦截宿主 stderr（如 llm-deepseek 的模型目录刷新日志），
+  // 避免盖住输入框；内容追加到 ~/.dsh-tui/host-stderr.log。插件卸载时还原。
+  if (shouldInstallHostStderrGuard()) {
+    ctx.effect(() => installHostStderrGuard(), 'tui-runner: host stderr guard')
+  }
   // 自定义主题装载（~/.dsh-tui/themes/*.json）：必须在 TuiApp 构造（读持久化
   // 主题偏好、解析 custom:<name>）之前——修历史孤儿导出（此前从未被调用）。
   // 警告收集进数组（不写 stderr），attach 后由 app 经 echoWarn 落 scrollback。
