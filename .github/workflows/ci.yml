@@ -47,3 +47,24 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:coverage
+
+  # 宿主版本矩阵：`engines.dsh` 声明了整条 0.2.2 补丁线
+  # （>=0.2.2-rc.3 <0.3.0-0），就得真的在两端各编译一次，而不是只信声明。
+  # 只跑 typecheck：下界要验的是类型契约没漂移，不是重跑全量行为测试。
+  host-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dsh-version: ['0.2.2-rc.3', '0.2.2-rc.5']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: repin host deps to ${{ matrix.dsh-version }}
+        run: node scripts/repin-host-deps.mjs ${{ matrix.dsh-version }}
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
+      - run: npm run typecheck
