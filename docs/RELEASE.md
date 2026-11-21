@@ -4,6 +4,20 @@
 
 当前线上：`@huiliyi37/dsh-tianshu-tui@1.0.0-rc.7`（npm `latest`）。发版后更新此行。
 
+## 自动化发布（推荐）
+
+仓库根 `.github/workflows/release.yml` 提供手动触发的发布流水线，顺序为：
+版本一致性 → 四门禁 → bundle 新鲜度 → `npm publish --provenance` → **等待 registry 可见** →
+核对 dist-tag → 建 GitHub Release。Actions 页面选 `Release` → Run workflow，填版本号与
+ dist-tag 即可。
+
+- 需要仓库 secret `NPM_TOKEN`（npmjs Automation token）。provenance 走 OIDC 不额外配置，
+  但要求仓库 public。
+- 「等待 registry 可见」不是冗余步骤：npm 自 2025 起是异步发布，`npm publish` 返回
+  成功时 tarball 可能仍是 404（rc.7 实测约 4 分钟后才可取）。流水线轮询 tarball 直到
+  200，超 5 分钟则失败。
+- 下面的手动步骤保留作备用路径（workflow 不可用、或需要跳过某步时）。
+
 ## 仓库坐标
 
 | 角色 | 地址 | remote 名 |
@@ -187,6 +201,7 @@ npx -y @deepseek-ai/dsh@next --profile tui
 - [ ] 主仓 `main` + tag `v<version>` 已推 `github`
 - [ ] 同样的 `main` + tag 已推 `omdsh`
 - [ ] npm `latest` = 新版本
+- [ ] **npm tarball 可取**：`https://registry.npmjs.org/@huiliyi37/dsh-tianshu-tui/-/dsh-tianshu-tui-<version>.tgz` 返回 200（不要凭 publish 输出判断）
 - [ ] 主仓 GitHub Release 已建
 - [ ] README 更新说明已上 `main`
 - [ ] `CHANGELOG.md` 已随版本更新（Unreleased → 版本号）

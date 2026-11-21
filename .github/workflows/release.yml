@@ -1,0 +1,103 @@
+name: Release
+
+# 手动触发的发布流水线。替代 docs/RELEASE.md 里那套本地手跑命令——
+# 本地发布依赖 ~/.npmrc 里的 token（rc.7 就卡在这一步）、且 npm 自 2025 起是
+# **异步发布**：`npm publish` 返回成功时 registry 可能还没有这个包（实测 rc.7
+# 约 4 分钟后 tarball 才可取）。所以这里把「可见性核对」做成发布的后置步骤，
+# 而不是发布后凭输出判断成功。
+#
+# 需要的仓库 secret：NPM_TOKEN（npmjs Automation token）。provenance 走 OIDC，
+# 不需要额外 secret，但要求仓库 public。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要发布的版本号，必须与 package.json 的 version 完全一致（例：1.0.0-rc.8）'
+        required: true
+        type: string
+      dist-tag:
+        description: 'npm dist-tag（预发布号也要用 latest，否则已装用户拉不到）'
+        required: true
+        default: latest
+        type: choice
+        options: [latest, next, rc]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 建 GitHub Release
+      id-token: write # npm provenance（OIDC）
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      - name: 版本一致性（输入 vs package.json）
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PKG_VERSION" != "${{ inputs.version }}" ]; then
+            echo "::error::package.json 版本为 $PKG_VERSION，与输入 ${{ inputs.version }} 不一致；先改版本并提交"
+            exit 1
+          fi
+
+      - name: 四门禁（lint / typecheck / test / build）
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: bundle 新鲜度（跟仓 lib/ 必须与全新 build 一致）
+        run: git diff --exit-code -- lib/
+
+      - name: 发布到 npm（带 provenance）
+        run: npm publish --access public --tag ${{ inputs.dist-tag }} --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # 关键：publish 的成功输出不等于包可用。轮询 tarball 直到 200。
+      - name: 等待 registry 可见（tarball 200）
+        run: |
+          URL="https://registry.npmjs.org/@huiliyi37/dsh-tianshu-tui/-/dsh-tianshu-tui-${{ inputs.version }}.tgz"
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL")
+            if [ "$CODE" = "200" ]; then
+              echo "tarball 可取（第 ${i} 次探测，约 $((i * 10))s）"
+              exit 0
+            fi
+            echo "第 ${i} 次探测 HTTP $CODE，等 10s"
+            sleep 10
+          done
+          echo "::error::5 分钟内 tarball 仍不可取（最后 HTTP $CODE）：包可能仍在 npm 队列，稍后手动核对"
+          exit 1
+
+      - name: 核对 dist-tag 指向
+        run: |
+          TAG=$(npm view @huiliyi37/dsh-tianshu-tui dist-tags.${{ inputs.dist-tag }})
+          echo "dist-tags.${{ inputs.dist-tag }} = $TAG"
+          if [ "$TAG" != "${{ inputs.version }}" ]; then
+            echo "::error::dist-tag 未指向新版本"
+            exit 1
+          fi
+
+      - name: 建 GitHub Release
+        run: |
+          NOTES=/tmp/release-notes.md
+          sed -n "/^## \[${{ inputs.version}\]/,/^## \[/p" CHANGELOG.md | sed '$d' > "$NOTES"
+          gh release create "v${{ inputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ inputs.version }}" \
+            --notes-file "$NOTES" \
+            --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
