@@ -196,6 +196,7 @@ Apache-2.0）；`service.ts`（LspService 封装）、`tools.ts`（三个模型�
 | src/ui/config-flow.ts | — | new（/config 投影装配：宿主 settings/permission/credentials 可缺；终端通知段始终带上） |
 | src/ui/inspect-panels.ts | — | new（检查类面板互斥标志、键语义与底栏 hint） |
 | src/ui/startup-pickers.ts | — | new（/model /theme /effort 选择器：Enter 本会话、S 写启动默认，自 app.ts 抽出保棘轮） |
+| src/ui/live-composition.ts | — | new（renderLive 快照组装：状态行格式化/workflow 视图 fold/委派切片三处派生收口为纯函数，自 app.ts 抽出保棘轮） |
 | src/ui/key-dialog.ts | ui/key-dialog.ts | ported（2026-08 回流：供应商 API Key 掩码输入对话框状态机） |
 | src/ui/key-flow.ts | — | new（装配提取层：上游 TuiApp 的 openKeyDialog 系列提取，棘轮对冲；key-wizard/key-dialog 之上） |
 | src/ui/key-wizard.ts | ui/key-wizard.ts | ported（2026-08 回流：/key 供应商选择纯函数层） |

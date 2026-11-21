@@ -96,8 +96,7 @@ import { renderSessionExport } from '../format/export.js'
 import type { TaskItem } from '../format/task-panel.js'
 // T1.2：/status 状态面板渲染函数（status-panel.ts 由 status_panel 维度提供；
 // 数据源为投影总线缓存——纯函数只读，不发明事件词汇）。Wave 2：面板行渲染
-// 统一由 render/live-panels 的 7 面板纯函数承担，app.ts 只 import 类型做快照组装。
-import type { GoalProjectionInput, PlanProjectionInput } from '../status-panel.js'
+// 统一由 render/live-panels 的 7 面板纯函数承担；快照组装在 ui/live-composition。
 // 投影层接线（docs/projection-layer.md）：turn 级工具统计（turn/end 摘要行）
 // 与会话级汇总（/status 会话段）——纯 fold 模型，输入即 session 事件流。
 import { applyTurnEvent, emptyTurnSummary, type TurnSummaryState } from '../turn-summary.js'
@@ -105,9 +104,10 @@ import { applySummaryEvent, emptySummaryState, summarizeSession, type SummarySta
 import { formatTurnSummary as renderTurnSummaryLine } from '../format/turn-summary.js'
 import { getToolFamily } from '../format/tool-meta.js'
 import {
-  delegationSnapshotSlice, foldActivityFromCaches, foldWorkflowViews, formatWorkflowSummary,
+  foldActivityFromCaches, formatWorkflowSummary,
   renderActivitySection,
 } from './activity-flow.js'
+import { buildLiveSnapshot } from './live-composition.js'
 import { WorkflowSurfaceController } from '../controllers/workflow-surface.js'
 import { DelegationSurfaceController, type SubagentsFacet } from '../controllers/delegation-surface.js'
 import { CommitSurface } from '../controllers/commit-surface.js'
@@ -135,7 +135,6 @@ import {
   renderLspPanel,
   renderActivityBand,
 } from '../render/live-panels.js'
-import type { LiveSnapshot } from '../render/live-snapshot.js'
 import {
   createLspBridge,
   selectDiagnosticSource,
@@ -240,7 +239,6 @@ import { formatStarWhaleLogo } from '../format/whale-star.js'
 import { formatBlueWhaleLogo } from '../format/whale-blue.js'
 import { formatTopBar } from '../format/top-bar.js'
 import { livePresetShort } from '../preset-catalog.js'
-import { formatTurnStatus } from '../format/turn-status.js'
 import { formatFooterInfo, type FooterRightSegment } from '../format/prompt-footer.js'
 import { formatWarnWithHint } from '../format/error-recovery.js'
 import { pushConfirmHints } from '../format/confirm-hints.js'
@@ -3777,57 +3775,47 @@ export class TuiApp {
     this.errorAnnouncer.announce(glance.errorFull, this.inputLine.value === '')
     // C4 概念稿 A：turn_status 形态——glance 状态行升级为 spinner（运行中
     // braille 帧循环 / 等待输入 pulsing ◆）+ 阶段文本；null 不占位。
-    const turnStatusLines = formatTurnStatus({
-      statusText: glance.status,
-      tick: this.tick,
-      active: this.liveAgent?.state.status === 'running',
-      width: cols,
-    }, theme)
     const now = Date.now()
-    const workflowRuns = foldWorkflowViews(this.workflowSurface.runningViews(), this.workflowSurface.completedViews(), now)
-    const snapshot: LiveSnapshot = {
+    const snapshot = buildLiveSnapshot({
       cols,
       theme,
-      glanceStatus: turnStatusLines[0] ?? null,
+      glanceStatus: glance.status,
       glanceError: glance.error,
+      tick: this.tick,
+      agentRunning: this.liveAgent?.state.status === 'running',
+      now,
       taskPanelVisible: this.inspect.is('tasks'),
       taskItems: this.taskItems,
       taskSnapshots: this.taskSnapshots,
       taskNotice: this.taskNotice,
       statusPanelVisible: this.inspect.is('status'),
-      goal: (this.projectionCache?.goal as GoalProjectionInput | undefined) ?? null,
-      todos: (this.projectionCache?.todos as TaskItem[] | null | undefined) ?? null,
-      plan: (this.projectionCache?.plan as PlanProjectionInput | undefined) ?? null,
-      // 投影层：会话级汇总段（本地 fold，宿主投影总线缺失时仍有数据）。
+      projectionCache: this.projectionCache,
       sessionTotals: {
         turns: this.sessionSummary.totalTurns,
         toolCalls: this.sessionSummary.totalToolCalls,
         elapsedMs: this.sessionSummary.totalElapsedMs,
       },
-      // todos 紧凑面板（/todos；与 /status 任务段、/tasks 窗格同源不同呈现）
       todosPanelVisible: this.todosPanelVisible,
       todosExpanded: this.todosExpanded,
-      todosItems: this.todosRetained,
-      ...delegationSnapshotSlice({
-        subagentsPanelVisible: this.subagentsPanelVisible, delegationEntries: this.delegationSurface.entries,
-        projectionCache: this.projectionCache, externalRuns: this.delegationSurface.externalRuns(), now,
-      }),
+      todosRetained: this.todosRetained,
+      subagentsPanelVisible: this.subagentsPanelVisible,
+      delegationEntries: this.delegationSurface.entries,
+      externalRuns: this.delegationSurface.externalRuns(),
       workflowPanelVisible: this.workflowPanelVisible,
-      workflowRuns,
+      runningWorkflows: this.workflowSurface.runningViews(),
+      completedWorkflows: this.workflowSurface.completedViews(),
       configPanelVisible: this.inspect.is('config'),
       configProjection: this.configProjection,
       skillsPanelVisible: this.inspect.is('skills'),
       skillItems: this.skillSurface.all(),
       skillSelected: this.skillSurface.selectedName(),
-      // LSP 面板（本地语言服务诊断；bridge 缓存折叠——桥未创建时视为无诊断）
       lspPanelVisible: this.inspect.is('lsp'),
       lspDiagnostics: this.lspDiagnosticsView(),
       lspAvailable: this.lspBridge === null ? true : this.lspBridge.isAvailable(),
-      tick: this.tick,
       activityBandEnabled: this.activityBandEnabled,
       activityItems,
       activityBandMaxRows: this.activityBandMaxRows,
-    }
+    })
 
     // ── 面板段（8 面板纯函数；组合器负责 { text } 包装与 theme 着色）。──
     // glance 段：状态行 + 错误行（metrics 已并入输入轨下方 footer，避免双份）。
