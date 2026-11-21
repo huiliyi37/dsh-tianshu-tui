@@ -29,32 +29,15 @@
     # 0.2.2-rc.1 的 schedule 工具依赖 Web sessionController；base TUI 不挂该服务，
     # 因此 standard/ptc/cordis 不同步 schedule 行，避免 Loader 永久 pending。
 
-    # LSP 模型工具面（任务6对齐，2026-08-27）：tianshu-public 三件套——
-    # seam（ctx.lsp 注册表）+ stdio 本地 provider + 模型工具（单 lsp 工具四操作：
-    # goToDefinition / findReferences / goToImplementation / hover）。lsp-local
-    # 默认给 typescript-language-server 一个 npx 条目（懒启动；npx 随 node 在场，
-    # 加载期解析不炸，首次查询按需拉取）；其他语言由用户照此追加 servers 条目。
-    # 无 provider 时模型查询收到结构化 LSP_UNAVAILABLE（schema 稳定）。
-    - id: lsp
-      name: '@huiliyi37/dsh-lsp'
-
-    - id: lsp-local
-      name: '@huiliyi37/dsh-lsp-local'
-      config:
-        servers:
-          typescript:
-            command: npx
-            args: ['-y', 'typescript-language-server', '--stdio']
-            extensionToLanguage:
-              .ts: typescript
-              .tsx: typescript
-              .js: javascript
-              .jsx: javascript
-              .mjs: javascript
-              .cjs: javascript
-
-    - id: tool-lsp
-      name: '@huiliyi37/dsh-tool-lsp'
+    # LSP：模型工具面已下线（2026-11 自研化）。原先装 tianshu-public 三件套
+    # （@huiliyi37/dsh-lsp + dsh-lsp-local + dsh-tool-lsp）提供 ctx.lsp 注册表、
+    # stdio provider 与单 lsp 模型工具（goToDefinition/findReferences/
+    # goToImplementation/hover）。该线已闭源（npm 标记 deprecated，「receives no
+    # fixes」），且注册模型工具与本包"纯展示层"边界冲突（见 ADAPTER.md）。
+    # TUI 的 /lsp 面板与工具卡诊断徽标本就由 src/lsp/ 自研实现承担（JSON-RPC
+    # client + 6 语言 server 注册表），不依赖该服务；移除后
+    # selectDiagnosticSource 直接走自研 fallback。模型侧若要 LSP 工具，应由宿主
+    # 侧插件提供，不在本包范围内。
 
     # The preset selection registry（对标 web-app 0.2.2-rc.5 cordis.patch.yml 尾行）。
     - id: agent-preset-registry

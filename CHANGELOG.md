@@ -3,6 +3,23 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
+## [Unreleased]
+
+### LSP 去闭源依赖（自研化）
+
+- 移除 bundle patch 里的 LSP 三件套装配（`@huiliyi37/dsh-lsp` / `dsh-lsp-local` /
+  `dsh-tool-lsp`），并清掉随附的 21 个 `@huiliyi37/*` 运行时依赖。该线已闭源
+  （npm 标记 deprecated，「receives no fixes」），且其中 `dsh-tool-lsp` 给模型注册
+  lsp 工具，与本包「不注册任何工具面」的边界声明冲突。
+- TUI 的 `/lsp` 面板与工具卡诊断徽标**不受影响**：它们本就由 `src/lsp/` 的自研实现
+  承担（JSON-RPC client + 6 语言 server 注册表，typescript/pyright/gopls/
+  rust-analyzer/clangd/jdtls），比原 `dsh-lsp-local` 配置的 1 种语言覆盖更广。
+  移除后 `selectDiagnosticSource` 直接走自研 fallback。
+- 模型侧 LSP 工具面回归文档既定设计：需要时由用户按需装配社区插件
+  `omdsh-dev/dsh-lsp`（docs/plugins.md），展示桥会自动消费其 `lsp` 服务。
+- 契约测试同步：删除 #54「三件套依赖闭包守卫」，`dsh-invariants` 断言翻转为
+  「dependencies 中不存在」。
+
 ## [1.0.0-rc.7] - 2026-11-21
 
 ### 宿主 0.2.2-rc.5 适配（issue #63）

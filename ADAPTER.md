@@ -54,7 +54,7 @@ TUI 是**纯展示层**:
 | `tools` | 工具卡 presenter 桥 | 软降级 |
 | `sessionPersistence` | 会话恢复列表 | 降级 |
 | `settings` / `permission` / `credentials` | `/config` 面板；`/key` profile/key 保存 | 对应段不渲染；pi-ai 编辑回退 key-only，新建不可用 |
-| `lsp` | LSP 诊断徽标 | 内置桥降级 |
+| `lsp` | LSP 诊断徽标 | 走自研 `src/lsp/`（JSON-RPC client + 6 语言 server registry）；�宿服务缺失是常态 |
 | `appExit` / `cmdlineArgs` | 退出 / --help | 降级 |
 | `commands` | slash 注册表(tui.commands 服务) | /help 警告 |
 
@@ -89,6 +89,13 @@ TUI 只订阅、只读、从不发布以下事件(会话事件按 owner 过滤):
 4. **路由/意图注入**:展示层不能成为路由权威;意图必须走 harness 侧插件。
 5. **auto-compact 自动触发**:主动调 compact 服务越展示层边界;只做提示
    (上下文 ≥95% ⚠ 水位)。
+6. **LSP 模型工具面**:模型可调的 goToDefinition / findReferences /
+   goToImplementation / hover 属**宿主侧能力面**,本包不注册工具。TUI 的 `/lsp` 面板
+   与工具卡诊断徽标由自研 `src/lsp/` 实现,不需要任何外部 LSP 插件即可工作。
+   需要给模型 LSP 工具时,由用户按需装配社区插件 `omdsh-dev/dsh-lsp`
+   (见 docs/plugins.md);那时展示桥会自动消费其 `lsp` 服务,与模型侧共享同一
+   server 集。2026-11 前本包曾在 bundle patch 里硬装闭源三件套提供该工具面,
+   既越界又与闭源维护风险重叠,已下线。
 
 ## Bundle Patch
 

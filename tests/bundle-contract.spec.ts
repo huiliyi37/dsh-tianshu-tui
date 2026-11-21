@@ -118,7 +118,7 @@ describe('published bundle contract', () => {
   it('invariant companion 保持无官方服务依赖的兼容 no-op', async () => {
     expect(pkg.peerDependencies['@deepseek-ai/dsh-invariants']).toBeUndefined()
     expect(pkg.devDependencies['@deepseek-ai/dsh-invariants']).toBeUndefined()
-    expect(pkg.dependencies['@huiliyi37/dsh-invariants']).toBe('0.8.0')
+    expect(pkg.dependencies['@huiliyi37/dsh-invariants']).toBeUndefined()
     expect(readRepo('src/invariant.ts')).not.toContain('@deepseek-ai/dsh-invariants')
     expect(readRepo('lib/invariant.js')).not.toContain('@deepseek-ai/dsh-invariants')
     const invariantUrl = new URL('../lib/invariant.js', import.meta.url).href
@@ -180,59 +180,5 @@ describe('published bundle contract', () => {
       return
     }
     expect(manifest.dsh?.bundle?.patch).toBeUndefined()
-  })
-})
-
-/**
- * 任务6 follow-up（#54 回归守卫）：内置 LSP 三件套的裸导入闭包必须完整。
- * 三件套把运行时依赖声明为 peerDependencies——pnpm autoInstallPeers:false 或
- * legacy-peer-deps 下都不会自动补装；tui 必须把他们实际 import 的每个
- * @huiliyi37/* 包显式列进自己的 dependencies（rc.23 就是漏了 cordis/tools/
- * brand 等导致整棵插件树启动失败）。
- */
-describe('@huiliyi37 LSP 三件套依赖闭包守卫（#54）', () => {
-  const TRIO = ['@huiliyi37/dsh-lsp', '@huiliyi37/dsh-lsp-local', '@huiliyi37/dsh-tool-lsp'] as const
-
-  function walkLib(dir: string): string[] {
-    const out: string[] = []
-    let entries: import('node:fs').Dirent[]
-    try {
-      entries = readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return out
-    }
-    for (const entry of entries) {
-      const full = join(dir, entry.name)
-      if (entry.isDirectory()) out.push(...walkLib(full))
-      else if (entry.name.endsWith('.js')) out.push(full)
-    }
-    return out
-  }
-
-  function bareImports(file: string): string[] {
-    const code = readFileSync(file, 'utf8')
-    const specs: string[] = []
-    for (const m of code.matchAll(/(?:\bfrom\s*|\bimport\s*)["'](\@[^"'./][^"']*)["']/g)) {
-      specs.push(m[1] as string)
-    }
-    return specs
-  }
-
-  it('裸包名导入都已声明为 tui dependencies，且安装进 node_modules 可解析', () => {
-    execFileSync('node', ['--input-type=module', '-e',
-      "for (const p of ['@huiliyi37/dsh-lsp','@huiliyi37/dsh-lsp-local','@huiliyi37/dsh-tool-lsp']) await import(p)",
-    ], { cwd: ROOT })
-    const pkgJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { dependencies: Record<string, string> }
-    const declared = new Set(Object.keys(pkgJson.dependencies))
-    const problems: string[] = []
-    for (const pkgName of TRIO) {
-      for (const file of walkLib(join(ROOT, 'node_modules', pkgName, 'lib'))) {
-        for (const spec of bareImports(file)) {
-          if (!spec.startsWith('@huiliyi37/') || spec.includes('/')) continue
-          if (!declared.has(spec)) problems.push(`${pkgName} → ${spec} 未声明于 tui dependencies`)
-        }
-      }
-    }
-    expect(problems, '三件套出现未声明的裸导入——装进 profile 后必炸（#54 同款）').toEqual([])
   })
 })
