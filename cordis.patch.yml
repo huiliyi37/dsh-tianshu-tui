@@ -6,7 +6,7 @@
 # 0.2.0：官方 `dsh-agent-presets`（文件根花名册）退场，改为
 # `dsh-agent-preset-registry`（声明注册表）+ 每预设一条 `dsh-agent-preset`
 # 声明行（声明式插件列表）。`agentPresets` 服务名与 mount/composeFrom/recompose
-# 接缝不变（preset-join.ts 的鸭式面继续命中）。预设声明与官方 web-app 0.2.2-rc.3
+# 接缝不变（preset-join.ts 的鸭式面继续命中）。预设声明与官方 web-app 0.2.2-rc.5
 # presets/*.patch.yml 对齐；schedule 行按下方宿主约束裁剪。
 
 - insert:
@@ -56,13 +56,13 @@
     - id: tool-lsp
       name: '@huiliyi37/dsh-tool-lsp'
 
-    # The preset selection registry（对标 web-app 0.2.2-rc.3 cordis.patch.yml 尾行）。
+    # The preset selection registry（对标 web-app 0.2.2-rc.5 cordis.patch.yml 尾行）。
     - id: agent-preset-registry
       name: '@deepseek-ai/dsh-agent-preset-registry'
       config:
         default: standard
 
-    # ── shipped 预设声明（与官方 web-app 0.2.2-rc.3 presets/ 对齐，schedule 除外）
+    # ── shipped 预设声明（与官方 web-app 0.2.2-rc.5 presets/ 对齐，schedule 除外）
 
     - id: preset-standard
       name: '@deepseek-ai/dsh-agent-preset'
@@ -524,7 +524,7 @@
             disabled: !!js "!ctx.get('profileContext')"
 
 # ── agent plane leaves the host (standard preset remounts these) ───────────
-# 与官方 web-app 0.2.2-rc.3 的 agent-plane 禁用清单对齐：注册表/存储类留在 host，
+# 与官方 web-app 0.2.2-rc.5 的 agent-plane 禁用清单对齐：注册表/存储类留在 host，
 # 模型面行由预设再挂。0.2.0 起 base 已无 tool-str-replace-editor 与
 # workflow-worker-thread 行（后者由 workflow-ptc 取代），相应禁用行移除；
 # 新增 tool-plugin-manager 与 command-goal 两行（web-app 同款）。

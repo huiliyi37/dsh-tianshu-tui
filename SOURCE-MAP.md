@@ -138,6 +138,7 @@
 | src/format/whale-blue.ts | — | new（blue 欢迎页（默认）蓝鲸抱星像素画：half-block 实色轨 44×17 文本格 + 水面倒影/气泡/腮红，品牌固定色 + 色深/宽度档降级，纯渲染） |
 | src/gutter.ts | gutter.ts | ported |
 | src/git-status.ts | — | new（git 仓库探测三函数：isGitRepo/gitBranch/gitDirtyCount，exec 注入；C4 自 ui/app.ts 提取） |
+| src/host-stderr-guard.ts | — | new（宿主 stderr 拦截：TUI 占用 TTY 期间把宿主诊断日志——如 llm-deepseek 的 /models 目录刷新——追加到 ~/.dsh-tui/host-stderr.log 并按 2MB 轮转，避免盖住输入框；插件卸载时还原，DSH_TUI_HOST_STDERR=1 可关闭） |
 | src/index.ts | — | new |
 | src/input-history.ts | — | new（输入历史持久化：~/.dsh-tui/input-history.json，1000 条上限、进程内追加队列 + 重读合并原子写；上游 history.ts 模式，去重语义取本仓更强的全列表去重） |
 | src/lsp/lsp-bridge.ts | — | new（LSP 诊断桥：懒生命周期 + 展示层诊断缓存；扩展名不支持/server 未安装一次标记；per-file 合并与冷却） |

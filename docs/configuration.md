@@ -31,7 +31,7 @@ dsh-tianshu-tui 的配置分三层:**装配时配置**(TuiRunnerConfig,插件注
 本包 `cordis.patch.yml` 已插入 `agent-preset-registry`（`default: standard`）与四条
 `dsh-agent-preset` 预设声明行（standard/ptc/minimal/cordis），并关掉
 host 上由官方 `standard` 预设再挂的 agent 面行。`plugin add` 本包会连带安装
-`@deepseek-ai/dsh-agent-preset-registry` 与 `@deepseek-ai/dsh-agent-preset`（精确钉 `0.2.2-rc.3`）。
+`@deepseek-ai/dsh-agent-preset-registry` 与 `@deepseek-ai/dsh-agent-preset`（`engines.dsh`/peer 声明补丁线范围 `>=0.2.2-rc.3 <0.3.0-0`）。
 命令名是 `/preset`，没有 `/presets`。
 新会话在 `setup` 里 `mount`；空白会话 `/preset <id>` 走官方 `recompose`。
 

@@ -100,6 +100,14 @@ agent 面行（由 shipped 预设再挂）。插件名 `tui-runner` 固定。
 
 ## 契约版本线
 
-- peerDependencies:宿主相关 `@deepseek-ai/dsh-*` 精确为 `0.2.2-rc.3`，`@deepseek-ai/cordis` 为 `~4.1.0`
-- README 里的官方 CLI `0.2.2-rc.3`（npm `next` 通道）是宿主版本,不是本包版本
-- 宿主版本漂移时:先升级 peer 范围再发版,不静默容忍
+- **宿主兼容门用 `engines.dsh` 声明范围**：`>=0.2.2-rc.3 <0.3.0-0`（整条 0.2.2 补丁线）。
+  宿主 `dsh-app-boot` 的判定规则是「有 `engines.dsh` 就只看它、peerDependencies 被整体忽略」，
+  所以范围写在这里，一次覆盖同线内的 rc 迭代——不再因为宿主升一个 rc 就让所有用户装不上
+  （issue #63）。
+- **peerDependencies 同步放宽**到同一范围，避免 profile 安装期 pnpm 的 peer 冲突。
+  `@deepseek-ai/cordis` 仍钉 `~4.1.0`（它不在宿主 dsh 兼容判定范围内）。
+- **devDependencies / dependencies 精确钉当前实测宿主**（当前 `0.2.2-rc.5`）：开发与随包
+  运行时装的就是实测算过的那一版；范围只表达兼容性,不表达实测点。
+- README 里的官方 CLI 版本（npm `next` 通道）是宿主版本,不是本包版本
+- 宿主**跨补丁线**漂移（如 0.3.x）时:先改 `engines.dsh`/peer 范围、升 dev 钉线、跑 typecheck
+  与测试实测,再发版；**不得**用 `dsh plugin allow-version` 豁免绕过兼容门装上了事

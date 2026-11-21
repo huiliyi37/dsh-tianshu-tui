@@ -8,7 +8,7 @@ dsh-tianshu-tui is an interactive terminal UI plugin for the official DeepSeek H
 - [`pnpm`](https://pnpm.io/installation) on your PATH (`dsh plugin` forwards to it)
 - An API key to run models: `DEEPSEEK_API_KEY` (or the official CLI's login flow)
 
-> **Do not type bare `dsh`.** If an old `dsh` is already on your PATH (e.g. `~/.local/bin/dsh` whose `dsh --version` is below `0.2.2-rc.3`), it will hit the local staging path and fail with `ERR_FS_EISDIR` / `Path is a directory .../@deepseek-ai/dsh`. Always use the `pnpm dlx` commands below.
+> **Do not type bare `dsh`.** If an old `dsh` is already on your PATH (e.g. `~/.local/bin/dsh` whose `dsh --version` is below `0.2.2-rc.5`), it will hit the local staging path and fail with `ERR_FS_EISDIR` / `Path is a directory .../@deepseek-ai/dsh`. Always use the `pnpm dlx` commands below.
 
 ## Install
 

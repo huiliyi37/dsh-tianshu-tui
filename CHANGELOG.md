@@ -3,6 +3,18 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
+## [1.0.0-rc.7] - 2026-11-21
+
+### 宿主 0.2.2-rc.5 适配（issue #63）
+
+- 修复宿主升到 `0.2.2-rc.4`/`rc.5` 后插件被兼容门拒绝安装（`installation rejected: Plugin ... is incompatible with dsh 0.2.2-rc.5`）。宿主 `dsh-app-boot` 的判定规则是「有 `engines.dsh` 就只看它、`peerDependencies` 被整体忽略」，因此兼容性改由 `engines.dsh: ">=0.2.2-rc.3 <0.3.0-0"` 声明整条 `0.2.2` 补丁线；宿主在同线内再发 rc 不再需要本包跟版。
+- 上界必须写成 `<0.3.0-0`：宿主判定带 `includePrerelease: true`，写 `<0.3.0` 会把 `0.3.0-rc.1` 一并放行（semver 里预发布版小于其正式版）。实测判定：`0.2.2-rc.3`／`rc.4`／`rc.5`／`rc.9`／`0.2.2`／`0.2.3-rc.1` 放行，`0.2.2-rc.1`（过旧）与 `0.3.0-rc.1`（跨线）拒绝。
+- `peerDependencies` 同步放宽到同一范围，避免 profile 安装期 pnpm 的 peer 冲突；`devDependencies`／`dependencies` 保持精确钉 `0.2.2-rc.5`（开发与随包运行时装的就是实测算过的那一版）。官方 `@deepseek-ai/dsh-*` 共 76 处声明由 `0.2.2-rc.3` 提升到 `0.2.2-rc.5`，`vision-ask` 的 peer/dev 同步。
+- `tests/bundle-contract.spec.ts` 断言改为「范围 + 钉线」双轨：`engines.dsh` 与 peer 必须是补丁线范围，dev/runtime 必须是当前实测宿主的精确版本；`ADAPTER.md` 的契约版本线随约定更新（不再主张"精确钉死 peer"）。
+- 顺带验证 `0.2.2-rc.4`／`rc.5` 未引入破坏性 API：`tsc --noEmit`（主仓 + vision-ask）零错误，`src/` 无需改动。
+
+验证：typecheck（主仓 + vision-ask）；`tests/bundle-contract.spec.ts` 15/15、`tests/host-stderr-guard.spec.ts` 6/6；宿主 `evaluatePluginCompatibility` 实跑八组版本判定。
+
 ## [1.0.0-rc.6] - 2026-11-15
 
 ### 宿主 0.2.2-rc.3 适配

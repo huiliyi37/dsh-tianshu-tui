@@ -37,10 +37,10 @@ It is a **presentation-only plugin**: agent state comes from the session event s
 |---|---|
 | Node.js | `>=24.9.0` |
 | Package manager | [`pnpm`](https://pnpm.io/installation), available through `corepack enable` |
-| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.3`, published on the npm `next` channel (`latest` still `0.2.2-rc.1`) |
-| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.6` |
+| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.5`, published on both the npm `next` and `latest` channels |
+| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.7` |
 
-> The host's npm `next` tag currently points to `0.2.2-rc.3`; `latest` still points to `0.2.2-rc.1`. The install commands keep `@next` explicit to avoid an older global CLI. This package is not a standalone CLI.
+> The host's npm `latest` and `next` tags both point to `0.2.2-rc.5`. This plugin declares the whole `0.2.2` patch line (`>=0.2.2-rc.3 <0.3.0-0`) through `engines.dsh`, so further rc releases on that line no longer require a matching plugin release. The install commands keep `@next` explicit to avoid an older global CLI. This package is not a standalone CLI.
 
 ### One-click install (recommended)
 
@@ -124,7 +124,7 @@ npm installs check for updates at startup. You can also run `/update` inside the
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-Current release: **[`1.0.0-rc.6`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.6)**, adapted to host `0.2.2-rc.3` (npm `next` channel; `latest` still `0.2.2-rc.1`). This release pins the official `@deepseek-ai/dsh-*` dependencies from `0.2.2-rc.1` to `0.2.2-rc.3` and follows the tightened `LlmError` failure-code contract: vision-provider failures are re-raised through `fromFailure` so their original codes survive, and HTTP classification narrows to built-in codes plus `HTTP_<status>`. The host bundle's new `cua` / `deepseek-chat-import` rows and the retired `agent-team-profile` row do not touch this package's assembly.
+Current release: **[`1.0.0-rc.7`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.7)**, adapted to host `0.2.2-rc.5`. This release fixes the plugin being rejected by the host compatibility gate after the host moved to `0.2.2-rc.4`/`rc.5` (issue #63): compatibility is now declared by `engines.dsh` over the patch line `>=0.2.2-rc.3 <0.3.0-0`, peer dependencies are widened to the same range, and the official `@deepseek-ai/dsh-*` dependencies are pinned to `0.2.2-rc.5`. Further rc releases on the same `0.2.2` line need no matching plugin release; crossing into `0.3.x` is still rejected.
 
 Upgrade by running `/update` and restarting, or rerun the `plugin add` command above. See [CHANGELOG.md](CHANGELOG.md) for the full release history, or run `/changelog` inside the TUI.
 

@@ -38,10 +38,10 @@
 |---|---|
 | Node.js | `>=24.9.0` |
 | 包管理器 | [`pnpm`](https://pnpm.io/installation)，可由 `corepack enable` 启用 |
-| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.3`（npm `next` 通道；`latest` 仍停 `0.2.2-rc.1`） |
-| 本插件 | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.6` |
+| DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.5`（npm `next` 与 `latest` 均为该版本） |
+| 本插件 | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.7` |
 
-> 宿主 npm `next` 当前为 `0.2.2-rc.3`，`latest` 仍停 `0.2.2-rc.1`。安装命令继续显式使用 `@next`，避免落到旧全局 CLI；本包也不是可独立运行的 CLI。
+> 宿主 npm `latest` 与 `next` 当前同为 `0.2.2-rc.5`。本插件用 `engines.dsh` 声明兼容整条 `0.2.2` 补丁线（`>=0.2.2-rc.3 <0.3.0-0`），宿主在同线内再发 rc 不需要本包跟版；安装命令仍显式使用 `@next`，避免落到旧全局 CLI。
 
 ### 一键安装（推荐）
 
@@ -125,7 +125,7 @@ pnpm dlx @deepseek-ai/dsh@next --profile tui
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-当前版本：**[`1.0.0-rc.6`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.6)**，适配宿主 `0.2.2-rc.3`（npm `next` 通道；`latest` 仍停 `0.2.2-rc.1`）。本版把官方 `@deepseek-ai/dsh-*` 依赖由 `0.2.2-rc.1` 精确提升到 `0.2.2-rc.3`，并跟上收紧的 `LlmError` 失败码契约：视觉 provider 的失败经 `fromFailure` 原样重抛，HTTP 归类收窄到内置码与 `HTTP_<status>`。宿主新增的 `cua` / `deepseek-chat-import` 行与退役的 `agent-team-profile` 行均不触及本包装配。
+当前版本：**[`1.0.0-rc.7`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.7)**，适配宿主 `0.2.2-rc.5`。本版修复宿主升到 `0.2.2-rc.4`/`rc.5` 后插件被兼容门拒绝安装（issue #63）：兼容性改由 `engines.dsh` 声明补丁线范围 `>=0.2.2-rc.3 <0.3.0-0`，peer 依赖同步放宽，官方 `@deepseek-ai/dsh-*` 依赖精确提升到 `0.2.2-rc.5`。宿主在同一条 `0.2.2` 线内再发 rc 版本不需要本包跟版；跨到 `0.3.x` 仍会被拒绝。
 
 升级到本版可在 TUI 中执行 `/update` 后重启，或重跑上方的 `plugin add` 命令。完整版本历史见 [CHANGELOG.md](CHANGELOG.md)，TUI 内可输入 `/changelog` 查看。
 
