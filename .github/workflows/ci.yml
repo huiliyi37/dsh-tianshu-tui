@@ -33,3 +33,17 @@ jobs:
       - name: bundle freshness (tracked lib/ must match fresh build)
         if: matrix.os == 'ubuntu-latest'
         run: git diff --exit-code -- lib/
+
+  # 覆盖率分组门禁：只卡纯函数目录（src/format/**、src/pi/**），阈值见
+  # vitest.config.ts。单独 job 而不并进矩阵——覆盖率跑一次约 50s，让 4 个
+  # 矩阵 job 各跑一遍只为拿同一份报告是浪费。
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:coverage

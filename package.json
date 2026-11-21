@@ -37,6 +37,7 @@
     "lint": "oxlint src tests scripts vision-ask/src vision-ask/tests",
     "typecheck": "tsc --noEmit && tsc --noEmit -p vision-ask/tsconfig.json",
     "test": "vitest run && vitest run --root vision-ask",
+    "test:coverage": "vitest run --coverage",
     "e2e:tui": "bash scripts/e2e-tui.sh"
   },
   "engines": {
@@ -140,6 +141,7 @@
     "@deepseek-ai/schemastery": "~3.19.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "24",
+    "@vitest/coverage-v8": "^4.1.12",
     "figlet": "^1.11.4",
     "oxlint": "^1.78.0",
     "tsdown": "0.22.14",
