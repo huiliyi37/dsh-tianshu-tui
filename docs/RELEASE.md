@@ -11,8 +11,9 @@
 核对 dist-tag → 建 GitHub Release。Actions 页面选 `Release` → Run workflow，填版本号与
  dist-tag 即可。
 
-- 需要仓库 secret `NPM_TOKEN`（npmjs Automation token）。provenance 走 OIDC 不额外配置，
-  但要求仓库 public。
+- **不需要任何 secret**：认证走 OIDC Trusted Publishing（workflow 已声明
+  `id-token: write`）。前提是 npmjs.com 该包的 Trusted Publisher 已绑定本仓库 +
+  workflow 文件名 `release.yml`，且仓库 public。provenance 由同一份 OIDC 身份签发。
 - 「等待 registry 可见」不是冗余步骤：npm 自 2025 起是异步发布，`npm publish` 返回
   成功时 tarball 可能仍是 404（rc.7 实测约 4 分钟后才可取）。流水线轮询 tarball 直到
   200，超 5 分钟则失败。

@@ -6,8 +6,9 @@ name: Release
 # 约 4 分钟后 tarball 才可取）。所以这里把「可见性核对」做成发布的后置步骤，
 # 而不是发布后凭输出判断成功。
 #
-# 需要的仓库 secret：NPM_TOKEN（npmjs Automation token）。provenance 走 OIDC，
-# 不需要额外 secret，但要求仓库 public。
+# 认证走 OIDC Trusted Publishing：**不需要 NPM_TOKEN secret**。前提是 npmjs.com 该包的
+# Trusted Publisher 已绑定本仓库 + 本 workflow 文件名（release.yml），且仓库 public。
+# provenance 也由同一份 OIDC 身份签发。
 on:
   workflow_dispatch:
     inputs:
@@ -60,10 +61,8 @@ jobs:
       - name: bundle 新鲜度（跟仓 lib/ 必须与全新 build 一致）
         run: git diff --exit-code -- lib/
 
-      - name: 发布到 npm（带 provenance）
+      - name: 发布到 npm（OIDC + provenance）
         run: npm publish --access public --tag ${{ inputs.dist-tag }} --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # 关键：publish 的成功输出不等于包可用。轮询 tarball 直到 200。
       - name: 等待 registry 可见（tarball 200）
