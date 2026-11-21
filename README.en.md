@@ -38,7 +38,7 @@ It is a **presentation-only plugin**: agent state comes from the session event s
 | Node.js | `>=24.9.0` |
 | Package manager | [`pnpm`](https://pnpm.io/installation), available through `corepack enable` |
 | DeepSeek Harness | `@deepseek-ai/dsh@0.2.2-rc.5`, published on both the npm `next` and `latest` channels |
-| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.8` |
+| This plugin | `@huiliyi37/dsh-tianshu-tui@1.0.0-rc.9` |
 
 > The host's npm `latest` and `next` tags both point to `0.2.2-rc.5`. This plugin declares the whole `0.2.2` patch line (`>=0.2.2-rc.3 <0.3.0-0`) through `engines.dsh`, so further rc releases on that line no longer require a matching plugin release. The install commands keep `@next` explicit to avoid an older global CLI. This package is not a standalone CLI.
 
@@ -124,7 +124,7 @@ npm installs check for updates at startup. You can also run `/update` inside the
 pnpm dlx @deepseek-ai/dsh@next plugin --profile tui add @huiliyi37/dsh-tianshu-tui
 ```
 
-Current release: **[`1.0.0-rc.8`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.8)**, adapted to host `0.2.2-rc.5`. This release drops the now-closed-source LSP plugin trio: the `/lsp` panel and tool-card diagnostic badges run on the built-in implementation (JSON-RPC client + a six-language server registry), widening language coverage from TypeScript only to TypeScript / Python / Go / Rust / C·C++ / Java, and removes 21 `@huiliyi37/*` runtime dependencies. For model-side LSP tools, install the community plugin `omdsh-dev/dsh-lsp` on demand.
+Current release: **[`1.0.0-rc.9`](https://github.com/huiliyi37/dsh-tianshu-tui/releases/tag/v1.0.0-rc.9)**, adapted to host `0.2.2-rc.5`. This is a release-pipeline fix: `release.yml` had never been loaded by GitHub due to an expression syntax error, `package-lock.json` was out of sync with `package.json` so `npm ci` failed, and npm authentication now uses OIDC Trusted Publishing (no `NPM_TOKEN` secret). Functionally identical to rc.8.
 
 Upgrade by running `/update` and restarting, or rerun the `plugin add` command above. See [CHANGELOG.md](CHANGELOG.md) for the full release history, or run `/changelog` inside the TUI.
 

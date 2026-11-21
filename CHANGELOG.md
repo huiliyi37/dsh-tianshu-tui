@@ -3,6 +3,19 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
+## [1.0.0-rc.9] - 2026-11-21
+
+### 发布链路修复（工程）
+
+- **`release.yml` 从未被 GitHub 加载**：`${{ inputs.version }}` 少了闭合的 ` }}`，
+  紧跟的 `\]` 让表达式解析器吞掉后续 shell 文本（`Unexpected symbol: 'version}'`）。
+  改为先把版本落到 shell 变量，再用 `awk` 提取 CHANGELOG 段落。
+- **`package-lock.json` 与 `package.json` 不同步**：`--legacy-peer-deps` 生成的 lock
+  不记录部分 peer 解析，`npm ci` 永远不同步（`Missing: ... from lock file`），
+  会让 CI 的 verify job 一起红。改用默认模式重算 lock。
+- **发布认证改走 OIDC Trusted Publishing**：移除 `NODE_AUTH_TOKEN`，不再依赖
+  `NPM_TOKEN` secret（无泄露风险、无 90 天过期、无 OTP）。
+
 ## [1.0.0-rc.8] - 2026-11-21
 
 ### LSP 去闭源依赖（自研化）
