@@ -92,7 +92,12 @@ jobs:
       - name: 建 GitHub Release
         run: |
           NOTES=/tmp/release-notes.md
-          sed -n "/^## \[${{ inputs.version}\]/,/^## \[/p" CHANGELOG.md | sed '$d' > "$NOTES"
+          VERSION="${{ inputs.version }}"
+          # 用 awk 而非 sed：`${{ inputs.version }}` 后面紧跟 `\]` 会让 GitHub 的
+          # 表达式解析器把后续 shell 文本吞进表达式（Unexpected symbol: 'version}'，
+          # 整个 workflow 无法加载）。这里先把版本落到 shell 变量，表达式只出现在
+          # 赋值里；awk 的 index() 又避开了方括号正则与转义。
+          awk -v v="$VERSION" '$0 ~ "^## \\[" { if (p) exit; if (index($0, "[" v "]")) p=1 } p' CHANGELOG.md > "$NOTES" || true
           gh release create "v${{ inputs.version }}" \
             --repo "${{ github.repository }}" \
             --title "${{ inputs.version }}" \
