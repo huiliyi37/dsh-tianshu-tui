@@ -832,7 +832,10 @@ export class TuiApp {
     this.resize = new ResizeHandler({ stdout: options.stdout })
     // 渲染帧合并器（T9）：事件路径（流式块）走 schedule 16ms 合并，
     // critical 路径保持同步 renderLive（flushNow 语义）。
-    this.renderBatcher = new WriteBatcher(() =>{  this.renderLive() })
+    // flush 采样点：帧合并后的实际渲染耗时（含 renderLive 全量组装）。
+    this.renderBatcher = new WriteBatcher(() => {
+      this.perfMonitor.measure('flush', () => { this.renderLive() })
+    })
     this.blockWriter = new BlockStreamWriter({ minChars: 60, maxChars: 200, idleMs: 180 },
       (block) => {
         /* v8 ignore next -- BlockStreamWriter flush 的 block 恒非空，push 恒返回 true */
@@ -3404,26 +3407,29 @@ export class TuiApp {
    * @returns 本次是否摄入过 delta（流为空时调用方需折 message.content 兜底）。
    */
   private ingestAssistantStream(stream: readonly AssistantStreamRecord[]): boolean {
-    const deltas = assistantDeltas(stream)
-    for (const delta of deltas) {
-      if (delta.kind === 'text') {
-        this.commitReasoningBlock()
-        this.blockWriter.push(delta.text)
-        // 首字立即穿透：文本 delta 原本只进 blockWriter，live 区尾部要等下一个
-        // 120ms ticker 才重绘（推理 delta 才有 schedule）。首个 delta 同步 flush
-        // 一次，首字延迟从 ≤120ms 降到 ≤16ms；后续 delta 仍走 ticker，不提高
-        // 稳态重绘频率。
-        if (!this.firstTextDeltaFlushed) {
-          this.firstTextDeltaFlushed = true
-          this.renderBatcher.flushNow()
+    // delta 采样点：处理一段压缩模型流的整体耗时（含 assistantDeltas 展开）。
+    return this.perfMonitor.measure('delta', () => {
+      const deltas = assistantDeltas(stream)
+      for (const delta of deltas) {
+        if (delta.kind === 'text') {
+          this.commitReasoningBlock()
+          this.blockWriter.push(delta.text)
+          // 首字立即穿透：文本 delta 原本只进 blockWriter，live 区尾部要等下一个
+          // 120ms ticker 才重绘（推理 delta 才有 schedule）。首个 delta 同步 flush
+          // 一次，首字延迟从 ≤120ms 降到 ≤16ms；后续 delta 仍走 ticker，不提高
+          // 稳态重绘频率。
+          if (!this.firstTextDeltaFlushed) {
+            this.firstTextDeltaFlushed = true
+            this.renderBatcher.flushNow()
+          }
+        } else {
+          if (this.reasoningText === '') this.reasoningStartedAt = delta.time
+          this.reasoningText += delta.text
+          this.renderBatcher.schedule()
         }
-      } else {
-        if (this.reasoningText === '') this.reasoningStartedAt = delta.time
-        this.reasoningText += delta.text
-        this.renderBatcher.schedule()
       }
-    }
-    return deltas.length > 0
+      return deltas.length > 0
+    })
   }
 
   /**
