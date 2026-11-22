@@ -10,6 +10,10 @@ name: Release
 # Trusted Publisher 已绑定本仓库 + 本 workflow 文件名（release.yml），且仓库 public。
 # provenance 也由同一份 OIDC 身份签发。
 on:
+  # 推 tag 即发布（与 dsh-office 的 publish.yml 一致）；也可在 Actions 页面手动 dispatch。
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -30,6 +34,11 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      # 两种入口：推 tag 时 ref_name 形如 v1.0.0-rc.9；手动 dispatch 时用输入的纯
+      # 版本号。各步骤统一用 ${RAW_VERSION#v} 取纯版本，避免维护两套变量。
+      RAW_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+      DIST_TAG: ${{ inputs.dist-tag || 'latest' }}
     permissions:
       contents: write # 建 GitHub Release
       id-token: write # npm provenance（OIDC）
@@ -43,11 +52,12 @@ jobs:
 
       - run: npm ci
 
-      - name: 版本一致性（输入 vs package.json）
+      - name: 版本一致性（发布目标 vs package.json）
         run: |
+          VERSION="${RAW_VERSION#v}"
           PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "$PKG_VERSION" != "${{ inputs.version }}" ]; then
-            echo "::error::package.json 版本为 $PKG_VERSION，与输入 ${{ inputs.version }} 不一致；先改版本并提交"
+          if [ "$PKG_VERSION" != "$VERSION" ]; then
+            echo "::error::package.json 版本为 $PKG_VERSION，与发布目标 $VERSION 不一致；先改版本并提交"
             exit 1
           fi
 
@@ -62,12 +72,13 @@ jobs:
         run: git diff --exit-code -- lib/
 
       - name: 发布到 npm（OIDC + provenance）
-        run: npm publish --access public --tag ${{ inputs.dist-tag }} --provenance
+        run: npm publish --access public --tag "$DIST_TAG" --provenance
 
       # 关键：publish 的成功输出不等于包可用。轮询 tarball 直到 200。
       - name: 等待 registry 可见（tarball 200）
         run: |
-          URL="https://registry.npmjs.org/@huiliyi37/dsh-tianshu-tui/-/dsh-tianshu-tui-${{ inputs.version }}.tgz"
+          VERSION="${RAW_VERSION#v}"
+          URL="https://registry.npmjs.org/@huiliyi37/dsh-tianshu-tui/-/dsh-tianshu-tui-$VERSION.tgz"
           for i in $(seq 1 60); do
             CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL")
             if [ "$CODE" = "200" ]; then
@@ -84,9 +95,10 @@ jobs:
 
       - name: 核对 dist-tag 指向
         run: |
-          TAG=$(npm view @huiliyi37/dsh-tianshu-tui dist-tags.${{ inputs.dist-tag }})
-          echo "dist-tags.${{ inputs.dist-tag }} = $TAG"
-          if [ "$TAG" != "${{ inputs.version }}" ]; then
+          VERSION="${RAW_VERSION#v}"
+          TAG=$(npm view "@huiliyi37/dsh-tianshu-tui" "dist-tags.$DIST_TAG")
+          echo "dist-tags.$DIST_TAG = $TAG"
+          if [ "$TAG" != "$VERSION" ]; then
             echo "::error::dist-tag 未指向新版本"
             exit 1
           fi
@@ -94,15 +106,15 @@ jobs:
       - name: 建 GitHub Release
         run: |
           NOTES=/tmp/release-notes.md
-          VERSION="${{ inputs.version }}"
-          # 用 awk 而非 sed：`${{ inputs.version }}` 后面紧跟 `\]` 会让 GitHub 的
-          # 表达式解析器把后续 shell 文本吞进表达式（Unexpected symbol: 'version}'，
-          # 整个 workflow 无法加载）。这里先把版本落到 shell 变量，表达式只出现在
-          # 赋值里；awk 的 index() 又避开了方括号正则与转义。
+          VERSION="${RAW_VERSION#v}"
+          # 用 awk 而非 sed：版本表达式后紧跟 `\]` 会让 GitHub 的表达式解析器把
+          # 后续 shell 文本吞进表达式（Unexpected symbol: 'version}'，整个 workflow
+          # 无法加载）。这里版本已由 RAW_VERSION 注入到 shell，awk 的 index() 又
+          # 避开了方括号正则与转义。
           awk -v v="$VERSION" '$0 ~ "^## \\[" { if (p) exit; if (index($0, "[" v "]")) p=1 } p' CHANGELOG.md > "$NOTES" || true
-          gh release create "v${{ inputs.version }}" \
+          gh release create "v$VERSION" \
             --repo "${{ github.repository }}" \
-            --title "${{ inputs.version }}" \
+            --title "$VERSION" \
             --notes-file "$NOTES" \
             --latest
         env:
