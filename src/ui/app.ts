@@ -1527,9 +1527,12 @@ export class TuiApp {
     })
     this.input.setMode('input')
     this.ticker = setInterval(() => {
-      if (this.hasVisibleSpinner()) this.tick++
+      // 每帧只 fold 一次活动项，hasVisibleSpinner 与 renderLive 共用——
+      // hasVisibleSpinner() 无参调用时默认参数会再 fold 一遍同一批缓存。
+      const activityItems = this.foldActivityItems()
+      if (this.hasVisibleSpinner(activityItems)) this.tick++
       this.renderLiveFromTicker = true
-      try { this.renderLive() }
+      try { this.renderLive(activityItems) }
       finally { this.renderLiveFromTicker = false }
     }, 120)
     this.ticker.unref()
@@ -3755,7 +3758,7 @@ export class TuiApp {
   }
 
   /** 渲染一帧 live 区：状态行 + 流式尾巴 + 进行中工具卡 + 输入行。 */
-  private renderLive(): void {
+  private renderLive(precomputedActivityItems?: ReturnType<typeof foldActivityFromCaches>): void {
     if (this.disposed) return
     // A6：全屏 overlay（命令面板/快捷键/搜索/rewind/memory）激活时处于
     // alternate screen buffer——跳过主屏 live 写屏，避免流式帧逐帧盖住面板；
@@ -3764,7 +3767,7 @@ export class TuiApp {
       this.lastIdleKey = null
       return
     }
-    const activityItems = this.foldActivityItems()
+    const activityItems = precomputedActivityItems ?? this.foldActivityItems()
     const idleKey = this.currentIdleKey(activityItems)
     if (this.renderLiveFromTicker && shouldSkipIdleAssemble({
       prevKey: this.lastIdleKey,
