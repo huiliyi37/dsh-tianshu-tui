@@ -271,6 +271,12 @@ export declare class TuiApp {
     private lastReasoningBlock;
     /** Ctrl+O 展开/收起最近推理块（live 区展示全文；scrollback 保持折叠头行）。 */
     private reasoningExpanded;
+    /**
+     * 本轮 step 是否已为首个文本 delta 做过同步穿透渲染。
+     * 首个 text delta 立即 flush，让首字不必等 live 区 120ms ticker；后续 delta
+     * 仍交给 ticker，避免把稳态帧率从 ~8fps 拉到 60fps。
+     */
+    private firstTextDeltaFlushed;
     /** 进行中工具的 presentCall 标题覆盖（callId → title）；result/abort/换会话清理。 */
     private readonly pendingCallTitles;
     private activeSessionId;

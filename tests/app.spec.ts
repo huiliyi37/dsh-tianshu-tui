@@ -2898,13 +2898,19 @@ describe('TuiApp 流式提交', () => {
     const emit = sessionEventBus(ctx)
     emit(id, { seq: 1, time: 1, type: 'turn/start', data: { turn: 1 } })
     emit(id, { seq: 2, time: 2, type: 'assistant/attempt', data: { turn: 1, step: 0, stream: [{ type: 'chunk', time: 2, chunk: { type: 'text-delta', text: '不应出现的残文' } }] } })
+    const writtenAtAbort = stdout.write.mock.calls.length
     app.handleAbort()
     emit(id, { seq: 3, time: 3, type: 'turn/end', data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'user' } } } })
     await new Promise(resolve => setImmediate(resolve))
 
-    const written = stdout.write.mock.calls.map(c => `${c[0]}`).join('')
-    expect(written).toContain('已取消')
-    expect(written).not.toContain('不应出现的残文')
+    // 首字立即刷新（firstTextDeltaFlushed）让 delta 到达时就同步渲染 live 区，
+    // 所以残文在 abort 之前会短暂可见——这是流式应有的行为，不是 scrollback 污染：
+    // scrollback 是 append-only、由 commit engine 写入，abort 时 blockWriter 仍走
+    // discard。断言因此改为「abort 之后的输出不再含残文」（保留原本要守的不变量），
+    // 而不是「整个输出流从不含残文」（那是旧实现“残文从不渲染”的副作用）。
+    const afterAbort = stdout.write.mock.calls.slice(writtenAtAbort).map(c => `${c[0]}`).join('')
+    expect(afterAbort).toContain('已取消')
+    expect(afterAbort).not.toContain('不应出现的残文')
     await app.dispose()
   })
 })

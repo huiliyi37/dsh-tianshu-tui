@@ -692,6 +692,13 @@ export class TuiApp {
   private lastReasoningBlock: { text: string; elapsedMs?: number } | null = null
   /** Ctrl+O 展开/收起最近推理块（live 区展示全文；scrollback 保持折叠头行）。 */
   private reasoningExpanded = false
+
+  /**
+   * 本轮 step 是否已为首个文本 delta 做过同步穿透渲染。
+   * 首个 text delta 立即 flush，让首字不必等 live 区 120ms ticker；后续 delta
+   * 仍交给 ticker，避免把稳态帧率从 ~8fps 拉到 60fps。
+   */
+  private firstTextDeltaFlushed = false
   /** 进行中工具的 presentCall 标题覆盖（callId → title）；result/abort/换会话清理。 */
   private readonly pendingCallTitles = new Map<ToolCallId, string>()
   private activeSessionId: SessionId | null = null
@@ -3399,6 +3406,14 @@ export class TuiApp {
       if (delta.kind === 'text') {
         this.commitReasoningBlock()
         this.blockWriter.push(delta.text)
+        // 首字立即穿透：文本 delta 原本只进 blockWriter，live 区尾部要等下一个
+        // 120ms ticker 才重绘（推理 delta 才有 schedule）。首个 delta 同步 flush
+        // 一次，首字延迟从 ≤120ms 降到 ≤16ms；后续 delta 仍走 ticker，不提高
+        // 稳态重绘频率。
+        if (!this.firstTextDeltaFlushed) {
+          this.firstTextDeltaFlushed = true
+          this.renderBatcher.flushNow()
+        }
       } else {
         if (this.reasoningText === '') this.reasoningStartedAt = delta.time
         this.reasoningText += delta.text
@@ -3421,6 +3436,7 @@ export class TuiApp {
     this.sessionSummary = applySummaryEvent(this.sessionSummary, event)
     switch (event.type) {
       case 'assistant/attempt': {
+        this.firstTextDeltaFlushed = false
         // 0.1.5：text/reasoning delta 批量打包进 attempt（压缩流记录展开）。
         // 注意 attempt 只在报错/中断路径出现——正常回合的正文经
         // assistant/message 内嵌 stream 到达（见该分支的回退渲染，#58）。
@@ -3435,6 +3451,7 @@ export class TuiApp {
         break
       }
       case 'assistant/message': {
+        this.firstTextDeltaFlushed = false
         // reasoning-only step（无 text-delta 的推理段）在消息组装点落底。
         this.commitReasoningBlock()
         // 0.1.5 正常成功回合不走实时流（attempt 只在报错/中断路径落盘），正文在
