@@ -3,6 +3,18 @@
 版本更新记录。安装与当前版本见 [README](README.md)；完整历史在此。
 `/changelog` 在 TUI 内查看（默认当前版本，`/changelog all` 全部，`/changelog N` 最近 N 版）。
 
+## [1.0.0-rc.10] - 2026-11-22
+
+### 性能
+
+- **首字立即穿透**：首个文本 delta 不再只进 `blockWriter`（live 区要等 120ms ticker），
+  改为同步 `flushNow` 一次。首字可见延迟从「最多一个 ticker 周期」降到「≤16ms 帧合并」；
+  每 step 只做一次，稳态重绘频率不变（仍 ~8fps）。
+- **ticker 去重**：每帧只 fold 一次活动项。此前 `hasVisibleSpinner()` 与 `renderLive()`
+  各 fold 一遍同一批缓存（subagentRuns / childProgress / workflowRuns / tasks）。
+- **补齐采样点**：`--debug-perf` 的 `delta` 与 `flush` 此前恒为 0，现已接上；
+  四个渲染管线热点（renderLive / delta / formatMarkdown / flush）都有 p50/p99/max。
+
 ## [1.0.0-rc.9] - 2026-11-21
 
 ### 发布链路修复（工程）
