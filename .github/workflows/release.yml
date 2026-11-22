@@ -68,7 +68,7 @@ jobs:
       - name: 等待 registry 可见（tarball 200）
         run: |
           URL="https://registry.npmjs.org/@huiliyi37/dsh-tianshu-tui/-/dsh-tianshu-tui-${{ inputs.version }}.tgz"
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL")
             if [ "$CODE" = "200" ]; then
               echo "tarball 可取（第 ${i} 次探测，约 $((i * 10))s）"
@@ -77,8 +77,10 @@ jobs:
             echo "第 ${i} 次探测 HTTP $CODE，等 10s"
             sleep 10
           done
-          echo "::error::5 分钟内 tarball 仍不可取（最后 HTTP $CODE）：包可能仍在 npm 队列，稍后手动核对"
-          exit 1
+          # 超时只告警、不失败：publish 步骤已经成功，包只是在 npm 的处理队列里。
+          # 让整个 workflow 变红会连带跳过后面的 dist-tag 核对与 Release 创建
+          # （1.0.0-rc.9 就是这样：包发出去了，Release 却没建）。
+          echo "::warning::10 分钟内 tarball 仍不可取（最后 HTTP $CODE）：包可能仍在 npm 队列，稍后手动核对"
 
       - name: 核对 dist-tag 指向
         run: |
